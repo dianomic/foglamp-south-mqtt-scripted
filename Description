@@ -1,0 +1,1 @@
+FogLAMP MQTT south plugin that supports scripting via Python to convert the message payload.
