@@ -20,7 +20,7 @@ using namespace rapidjson;
  *
  * @param name	The name of the south service
  */
-PythonScript::PythonScript(const string& name) : m_init(false), m_pFunc(NULL)
+PythonScript::PythonScript(const string& name) : m_init(false), m_pFunc(NULL), m_libpythonHandle(NULL)
 {
 	m_logger = Logger::getLogger();
 	wchar_t *programName = Py_DecodeLocale(name.c_str(), NULL);
@@ -73,7 +73,6 @@ PythonScript::~PythonScript()
 		{
 			dlclose(m_libpythonHandle);
 		}
-		PyGILState_Release(state);
 	}
 }
 
