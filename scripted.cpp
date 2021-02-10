@@ -54,7 +54,7 @@ void connlost(void *context, char *cause)
  *
  * @param config	The configuration category
  */
-MQTTScripted::MQTTScripted(ConfigCategory *config)
+MQTTScripted::MQTTScripted(ConfigCategory *config) : m_python(NULL)
 {
 	m_logger = Logger::getLogger();
 	m_asset = config->getValue("asset");
@@ -171,11 +171,53 @@ void MQTTScripted::reconfigure(const ConfigCategory& category)
 {
 	lock_guard<mutex> guard(m_mutex);
 	m_asset = category.getValue("asset");
-	m_broker = category.getValue("broker");
-	m_topic = category.getValue("topic");
+	string broker = category.getValue("broker");
+	bool resubscribe = false;
+	if (broker.compare(m_broker))
+	{
+		resubscribe = true;
+	}
+	m_broker = broker;
+	string topic = category.getValue("topic");
+	if (topic.compare(m_topic))
+	{
+		resubscribe = true;
+	}
+	m_topic = topic;
+
+	if (resubscribe)
+	{
+		// The MQTT broker has changed
+		(void)MQTTClient_disconnect(m_client, 10000);
+		MQTTClient_destroy(&m_client);
+
+
+		// Connect to the new MQTT broker
+		MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
+		MQTTClient_deliveryToken token;
+		int rc;
+
+		if ((rc = MQTTClient_create(&m_client, m_broker.c_str(), m_clientID.c_str(),
+			MQTTCLIENT_PERSISTENCE_NONE, NULL)) != MQTTCLIENT_SUCCESS)
+		{
+			Logger::getLogger()->error("Failed to create client, return code %d\n", rc);
+		}
+		else
+		{
+			MQTTClient_setCallbacks(m_client, this, connlost, msgarrvd, NULL);
+			reconnect();
+		}
+	}
+
 	m_script = category.getValue("script");
 	if (m_python && m_script.empty() == false)
 	{
+
+		if (m_python)
+		{
+			delete m_python;
+		}
+		m_python = new PythonScript(category.getName());
 		m_python->setScript(m_script);
 	}
 }
