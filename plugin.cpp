@@ -147,8 +147,8 @@ MQTTScripted *mqtt = (MQTTScripted *)handle;
  */
 void plugin_reconfigure(PLUGIN_HANDLE *handle, string& newConfig)
 {
-ConfigCategory	config("new", newConfig);
 MQTTScripted		*mqtt = (MQTTScripted *)*handle;
+ConfigCategory	config(mqtt->getName(), newConfig);
 
 	mqtt->reconfigure(config);
 }

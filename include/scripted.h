@@ -47,11 +47,13 @@ class MQTTScripted {
 				}
 		void		processMessage(const std::string& topic, const std::string& payload);
 		void		reconnect();
+		std::string	getName() { return m_name; };
 	private:
 		std::string		m_asset;
 		std::string		m_broker;
 		std::string		m_topic;
 		std::string		m_script;
+		std::string		m_content;
 		int			m_qos;
 		std::string		m_clientID;
 		Logger			*m_logger;
@@ -60,5 +62,7 @@ class MQTTScripted {
 		void			*m_data;
 		void			(*m_ingest)(void *, Reading);
 		PythonScript		*m_python;
+		std::string		m_name;
+		bool			m_restart;
 };
 #endif
