@@ -26,6 +26,7 @@ class PythonScript {
 		Logger			*m_logger;
 		void			*m_libpythonHandle;
 		PyObject		*m_pFunc;
+		PyObject		*m_pModule;
 };
 
 #endif
