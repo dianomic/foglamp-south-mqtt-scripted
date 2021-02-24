@@ -170,7 +170,7 @@ Document *doc = NULL;
 					: PyBytes_AsString(key);
 				if (PyLong_Check(value) || PyLong_Check(value))
 				{
-					doc->AddMember(Value(name, alloc), Value(PyLong_AsLong(value)), alloc);
+					doc->AddMember(Value(name, alloc), Value((int64_t)PyLong_AsLong(value)), alloc);
 				}
 				else if (PyFloat_Check(value))
 				{
