@@ -26,12 +26,12 @@ An example script, assuming the payload in the message is simply a value, might 
 
 .. code-block:: json
 
-   def convert(message):
+   def convert(message, topic):
        return {
            'temperature' : float(message)
        }
 
-Note that the message is passed as a string and the data we wish to
+Note that the message and topic are passed as a strings and the data we wish to
 ingest into FogLAMP in this case is assumed to be a floating point value.
 The example above of course is unnecessary as the plugin can consume this
 data without the need of a script.

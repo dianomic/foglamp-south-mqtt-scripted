@@ -138,7 +138,7 @@ bool PythonScript::setScript(const string& name)
  *
  * @param message	The MQTT message string
  */
-Document *PythonScript::execute(const string& message)
+Document *PythonScript::execute(const string& message, const string& topic)
 {
 Document *doc = NULL;
 
@@ -147,7 +147,7 @@ Document *doc = NULL;
 	{
 		if (PyCallable_Check(m_pFunc))
 		{
-			PyObject *pReturn = PyObject_CallFunction(m_pFunc, "s", message.c_str());
+			PyObject *pReturn = PyObject_CallFunction(m_pFunc, "ss", message.c_str(), topic.c_str());
 			if (!pReturn)
 			{
 				m_logger->error("Python convert function failed to return data");

@@ -303,7 +303,7 @@ Document doc;
 			m_restart = false;
 		}
 		// Give the message to the script to process
-		Document *d = m_python->execute(message);
+		Document *d = m_python->execute(message, topic);
 		if (d)
 		{
 			vector<Datapoint *> points;
