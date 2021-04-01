@@ -18,7 +18,7 @@ using namespace std;
 using namespace rapidjson;
 
 /**
- * Callback when an MQTT message arrives fo rthe topic to which we are subscribed
+ * Callback when an MQTT message arrives for the topic to which we are subscribed
  */
 int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *message)
 {
@@ -33,9 +33,9 @@ char *payloadptr;
 	}
 	buf[message->payloadlen] = 0;
 	MQTTClient_freeMessage(&message);
-	MQTTClient_free(topicName);
 	MQTTScripted *mqtt = (MQTTScripted *)context;
 	mqtt->processMessage(topicName, buf);
+	MQTTClient_free(topicName);
 	free(buf);
 	return 1;
 }
