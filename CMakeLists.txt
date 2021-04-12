@@ -36,7 +36,11 @@ file(GLOB SOURCES *.cpp)
 
 # Find python3.x dev/lib package
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(PYTHON REQUIRED python3)
+if(${CMAKE_VERSION} VERSION_LESS "3.12.0") 
+    pkg_check_modules(PYTHON REQUIRED python3)
+else()
+    find_package(Python COMPONENTS Interpreter Development)
+endif()
 
 # Find FogLAMP includes and libs, by including FindFogLAMP.cmak file
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR})
@@ -58,17 +62,30 @@ include_directories(include)
 include_directories(${FOGLAMP_INCLUDE_DIRS})
 
 # Add Python 3.x header files
-include_directories(${PYTHON_INCLUDE_DIRS})
+if(${CMAKE_VERSION} VERSION_LESS "3.12.0") 
+    include_directories(${PYTHON_INCLUDE_DIRS})
+else()
+    include_directories(${Python_INCLUDE_DIRS})
+endif()
 
 # Pass RELEASE_CODENAME to C++ build for "buster" only
 if (RELEASE_CODENAME)
         if (${RELEASE_CODENAME} MATCHES "buster")
-                add_definitions(-DPLUGIN_PYTHON_SHARED_LIBRARY=lib${PYTHON_LIBRARIES}.so)
-                message(STATUS "Setting -DPYTHON_SHARED_LIBRARY=lib${PYTHON_LIBRARIES}.so for ${CMAKE_SYSTEM} on ${RELEASE_CODENAME}")
+                if(${CMAKE_VERSION} VERSION_LESS "3.12.0") 
+                        add_definitions(-DPLUGIN_PYTHON_SHARED_LIBRARY=lib${PYTHON_LIBRARIES}.so)
+                        message(STATUS "Setting -DPYTHON_SHARED_LIBRARY=lib${PYTHON_LIBRARIES}.so for ${CMAKE_SYSTEM} on ${RELEASE_CODENAME}")
+                else()
+                        add_definitions(-DPLUGIN_PYTHON_SHARED_LIBRARY=lib${Python_LIBRARIES}.so)
+                        message(STATUS "Setting -DPYTHON_SHARED_LIBRARY=lib${Python_LIBRARIES}.so for ${CMAKE_SYSTEM} on ${RELEASE_CODENAME}")
+                endif()
         endif()
 endif()
 
-link_directories(${PYTHON_LIBRARY_DIRS})
+if(${CMAKE_VERSION} VERSION_LESS "3.12.0") 
+    link_directories(${PYTHON_LIBRARY_DIRS})
+else()
+    link_directories(${Python_LIBRARY_DIRS})
+endif()
 
 
 # Add other include paths
@@ -84,7 +101,11 @@ add_library(${PROJECT_NAME} SHARED ${SOURCES} version.h)
 target_link_libraries(${PROJECT_NAME} ${NEEDED_FOGLAMP_LIBS})
 
 # Add additional libraries
-target_link_libraries(${PROJECT_NAME} -lssl -lcrypto -lpaho-mqtt3c ${PYTHON_LIBRARIES})
+if(${CMAKE_VERSION} VERSION_LESS "3.12.0") 
+    target_link_libraries(${PROJECT_NAME} -lssl -lcrypto -lpaho-mqtt3c ${PYTHON_LIBRARIES})
+else()
+    target_link_libraries(${PROJECT_NAME} -lssl -lcrypto -lpaho-mqtt3c ${Python_LIBRARIES})
+endif()
 
 # Set the build version 
 set_target_properties(${PROJECT_NAME} PROPERTIES SOVERSION 1)
@@ -95,3 +116,4 @@ if (FOGLAMP_INSTALL)
 	message(STATUS "Installing ${PROJECT_NAME} in ${FOGLAMP_INSTALL}/plugins/${PLUGIN_TYPE}/${PROJECT_NAME}")
 	install(TARGETS ${PROJECT_NAME} DESTINATION ${FOGLAMP_INSTALL}/plugins/${PLUGIN_TYPE}/${PROJECT_NAME})
 endif()
+
