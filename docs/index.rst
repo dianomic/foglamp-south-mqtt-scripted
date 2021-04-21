@@ -24,7 +24,7 @@ document as a Python DICT.
 
 An example script, assuming the payload in the message is simply a value, might be a follows
 
-.. code-block:: json
+.. code-block:: Python
 
    def convert(message, topic):
        return {
