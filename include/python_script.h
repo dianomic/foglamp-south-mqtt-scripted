@@ -19,7 +19,7 @@ class PythonScript {
 		PythonScript(const std::string& name);
 		~PythonScript();
 		bool			setScript(const std::string& file);
-		rapidjson::Document	*execute(const std::string& message, const std::string& topic);
+		rapidjson::Document	*execute(const std::string& message, const std::string& topic,  std::string& asset);
 	private:
 		std::string		m_script;
 		bool			m_init;

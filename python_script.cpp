@@ -106,6 +106,13 @@ bool PythonScript::setScript(const string& name)
 		m_script = m_script.substr(0, end);
 	}
 	PyGILState_STATE state = PyGILState_Ensure();
+
+	//# FIXME_I
+	Logger::getLogger()->setMinLevel("debug");
+	Logger::getLogger()->debug("xxx2 %s - m_script :%s:", __FUNCTION__, m_script.c_str());
+	Logger::getLogger()->setMinLevel("warning");
+
+
 	PyObject *pName = PyUnicode_FromString((char *)m_script.c_str());
 	if (m_pModule)
 		m_pModule = PyImport_ReloadModule(m_pModule);
@@ -138,25 +145,59 @@ bool PythonScript::setScript(const string& name)
  *
  * @param message	The MQTT message string
  */
-Document *PythonScript::execute(const string& message, const string& topic)
+Document *PythonScript::execute(const string& message, const string& topic, string& asset)
 {
 Document *doc = NULL;
+
+	//# FIXME_I
+	Logger::getLogger()->setMinLevel("debug");
+	Logger::getLogger()->debug("xxx2 %s - ", __FUNCTION__);
+	Logger::getLogger()->setMinLevel("warning");
 
 	PyGILState_STATE state = PyGILState_Ensure();
 	if (m_pFunc)
 	{
 		if (PyCallable_Check(m_pFunc))
 		{
+			// FIXME_I:
+			PyObject dict;
 			PyObject *pReturn = PyObject_CallFunction(m_pFunc, "ss", message.c_str(), topic.c_str());
 			if (!pReturn)
 			{
 				m_logger->error("Python convert function failed to return data");
 				return NULL;
 			}
-			else if (!PyDict_Check(pReturn))
+			else
 			{
-				m_logger->error("Return from Python convert function is not a DICT object");
-				return NULL;
+				//# FIXME_I
+				Logger::getLogger()->setMinLevel("debug");
+				Logger::getLogger()->debug("xxx %s - bk2 ", __FUNCTION__);
+				Logger::getLogger()->setMinLevel("warning");
+
+				// FIXME_I:
+				if (PyTuple_Check(pReturn)) {
+
+					PyArg_ParseTuple(pReturn, "s|o", &asset, &dict);
+
+					//# FIXME_I
+					Logger::getLogger()->setMinLevel("debug");
+					Logger::getLogger()->debug("xxx %s - bk3 :%s: ", __FUNCTION__, asset.c_str());
+					Logger::getLogger()->setMinLevel("warning");
+
+					if (!PyDict_Check(&dict)){
+
+						// FIXME_I:
+						m_logger->error("xxx2 Return from Python convert function is not a DICT object");
+						return NULL;
+					} else {
+						pReturn = &dict;
+					}
+				} else if (!PyDict_Check(pReturn)) {
+
+					// FIXME_I:
+					m_logger->error("xxx2 Return from Python convert function is neither a DICT object or a TUPLE");
+					return NULL;
+				}
 			}
 			doc = new Document();
 			auto& alloc = doc->GetAllocator();

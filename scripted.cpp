@@ -232,9 +232,19 @@ void MQTTScripted::processMessage(const string& topic,const  string& message)
 {
 Document doc;
 
+	//# FIXME_I
+	Logger::getLogger()->setMinLevel("debug");
+	Logger::getLogger()->debug("xxx2 %s - ", __FUNCTION__);
+	Logger::getLogger()->setMinLevel("warning");
+
 	Logger::getLogger()->debug("Processing MQTT message: %s with script %s", message.c_str(), m_script.c_str());
 	if (m_script.empty() || m_script.compare("\"\"") == 0)
 	{
+		//# FIXME_I
+		Logger::getLogger()->setMinLevel("debug");
+		Logger::getLogger()->debug("xxx2 %s - brk 1", __FUNCTION__);
+		Logger::getLogger()->setMinLevel("warning");
+
 		// Message should be JSON
 		doc.Parse(message.c_str());
 		if (doc.HasParseError() == false && doc.IsObject())
@@ -291,6 +301,14 @@ Document doc;
 	}
 	else
 	{
+		// FIXME_I:
+		string asset;
+
+		//# FIXME_I
+		Logger::getLogger()->setMinLevel("debug");
+		Logger::getLogger()->debug("xxx2 %s - brk 2 :%s: :%s:", __FUNCTION__ , message.c_str(), topic.c_str());
+		Logger::getLogger()->setMinLevel("warning");
+
 		if (m_restart)
 		{
 			Logger::getLogger()->info("Script content has change, reloading");
@@ -303,7 +321,7 @@ Document doc;
 			m_restart = false;
 		}
 		// Give the message to the script to process
-		Document *d = m_python->execute(message, topic);
+		Document *d = m_python->execute(message, topic, asset);
 		if (d)
 		{
 			vector<Datapoint *> points;
@@ -329,7 +347,13 @@ Document doc;
 					points.push_back(new Datapoint( m.name.GetString(), dpv));
 				}
 			}
-			Reading reading(m_asset, points);
+			// FIXME_I:
+			if (asset.empty()) {
+
+				asset = m_asset;
+			}
+
+			Reading reading(asset, points);
 			(*m_ingest)(m_data, reading);
 
 			delete d;
