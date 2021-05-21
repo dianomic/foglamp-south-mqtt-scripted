@@ -151,12 +151,18 @@ Document *doc = NULL;
 
 	//# FIXME_I
 	Logger::getLogger()->setMinLevel("debug");
-	Logger::getLogger()->debug("xxx2 %s - ", __FUNCTION__);
+	Logger::getLogger()->debug("xxx2 %s - v2", __FUNCTION__);
 	Logger::getLogger()->setMinLevel("warning");
 
 	PyGILState_STATE state = PyGILState_Ensure();
 	if (m_pFunc)
 	{
+
+		//# FIXME_I
+		Logger::getLogger()->setMinLevel("debug");
+		Logger::getLogger()->debug("xxx2 %s - BRK 1 ", __FUNCTION__);
+		Logger::getLogger()->setMinLevel("warning");
+
 		if (PyCallable_Check(m_pFunc))
 		{
 			// FIXME_I:
@@ -242,6 +248,14 @@ Document *doc = NULL;
 	{
 		m_logger->fatal("Unable to create Python reference to function \"convert\"");
 	}
+
+
+	//# FIXME_I
+	Logger::getLogger()->setMinLevel("debug");
+	Logger::getLogger()->debug("xxx2 %s - BRK 2 ", __FUNCTION__);
+	Logger::getLogger()->setMinLevel("warning");
+
+
 	PyGILState_Release(state);
 	return doc;
 }

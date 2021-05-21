@@ -353,6 +353,11 @@ Document doc;
 				asset = m_asset;
 			}
 
+			//# FIXME_I
+			Logger::getLogger()->setMinLevel("debug");
+			Logger::getLogger()->debug("xxx2 %s - brk 3 msg :%s: topic :%s: asset :%s: ", __FUNCTION__ , message.c_str(), topic.c_str(), asset.c_str() );
+			Logger::getLogger()->setMinLevel("warning");
+
 			Reading reading(asset, points);
 			(*m_ingest)(m_data, reading);
 

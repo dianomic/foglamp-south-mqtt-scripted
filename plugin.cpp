@@ -102,6 +102,11 @@ PLUGIN_HANDLE plugin_init(ConfigCategory *config)
 MQTTScripted	*mqtt;
 
 
+	//# FIXME_I
+	Logger::getLogger()->setMinLevel("debug");
+	Logger::getLogger()->debug("xxx2 %s - ", __FUNCTION__);
+	Logger::getLogger()->setMinLevel("warning");
+
 	mqtt = new MQTTScripted(config);
 	return (PLUGIN_HANDLE)mqtt;
 }
@@ -125,6 +130,13 @@ MQTTScripted *mqtt = (MQTTScripted *)handle;
 void plugin_register_ingest(PLUGIN_HANDLE *handle, INGEST_CB cb, void *data)
 {
 MQTTScripted *mqtt = (MQTTScripted *)handle;
+
+
+	//# FIXME_I
+	Logger::getLogger()->setMinLevel("debug");
+	Logger::getLogger()->debug("xxx2 %s - ", __FUNCTION__);
+	Logger::getLogger()->setMinLevel("warning");
+
 
 	if (!handle)
 		throw new exception();
