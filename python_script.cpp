@@ -148,6 +148,11 @@ bool PythonScript::setScript(const string& name)
 Document *PythonScript::execute(const string& message, const string& topic, string& asset)
 {
 Document *doc = NULL;
+	// FIXME_I:
+	char *strBuffer;
+
+	// FIXME_I:
+	strBuffer = (char *) malloc(1000);
 
 	//# FIXME_I
 	Logger::getLogger()->setMinLevel("debug");
@@ -160,57 +165,182 @@ Document *doc = NULL;
 
 		//# FIXME_I
 		Logger::getLogger()->setMinLevel("debug");
-		Logger::getLogger()->debug("xxx2 %s - BRK 1 ", __FUNCTION__);
+		Logger::getLogger()->debug("xxx2 %s - BRK 1 v2 ", __FUNCTION__);
 		Logger::getLogger()->setMinLevel("warning");
 
 		if (PyCallable_Check(m_pFunc))
 		{
+			//# FIXME_I
+			Logger::getLogger()->setMinLevel("debug");
+			Logger::getLogger()->debug("xxx2 %s - BRK 1.1 ", __FUNCTION__);
+			Logger::getLogger()->setMinLevel("warning");
+
+
 			// FIXME_I:
-			PyObject dict;
+			PyObject *dict;
+			PyObject *pValue;
 			PyObject *pReturn = PyObject_CallFunction(m_pFunc, "ss", message.c_str(), topic.c_str());
+
+			//# FIXME_I
+			Logger::getLogger()->setMinLevel("debug");
+			Logger::getLogger()->debug("xxx2 %s - BRK 1.2  %s %s", __FUNCTION__,  message.c_str(), topic.c_str());
+			Logger::getLogger()->setMinLevel("warning");
+
 			if (!pReturn)
 			{
-				m_logger->error("Python convert function failed to return data");
+				m_logger->error("xxx2 Python convert function failed to return data");
 				return NULL;
 			}
 			else
 			{
 				//# FIXME_I
 				Logger::getLogger()->setMinLevel("debug");
-				Logger::getLogger()->debug("xxx %s - bk2 ", __FUNCTION__);
+				Logger::getLogger()->debug("xxx2 %s - bk2 v2", __FUNCTION__);
+				Logger::getLogger()->setMinLevel("warning");
+
+				//# FIXME_I
+				Logger::getLogger()->setMinLevel("debug");
+				Logger::getLogger()->debug("xxx2 %s - bk0.1 ", __FUNCTION__);
 				Logger::getLogger()->setMinLevel("warning");
 
 				// FIXME_I:
 				if (PyTuple_Check(pReturn)) {
 
-					PyArg_ParseTuple(pReturn, "s|o", &asset, &dict);
+					//# FIXME_I
+					Logger::getLogger()->setMinLevel("debug");
+					Logger::getLogger()->debug("xxx2 %s - bk0.2 ", __FUNCTION__);
+					Logger::getLogger()->setMinLevel("warning");
+
 
 					//# FIXME_I
 					Logger::getLogger()->setMinLevel("debug");
-					Logger::getLogger()->debug("xxx %s - bk3 :%s: ", __FUNCTION__, asset.c_str());
+					Logger::getLogger()->debug("xxx2 %s - bk2.2 ", __FUNCTION__);
 					Logger::getLogger()->setMinLevel("warning");
 
-					if (!PyDict_Check(&dict)){
+					try {
 
-						// FIXME_I:
-						m_logger->error("xxx2 Return from Python convert function is not a DICT object");
-						return NULL;
-					} else {
-						pReturn = &dict;
+						if (PyArg_ParseTuple(pReturn, "so", &strBuffer, &dict) == false) {
+
+							//# FIXME_I
+							Logger::getLogger()->setMinLevel("debug");
+							Logger::getLogger()->error("xxx2 %s - bk3 PyArg_ParseTuple :%s: ", __FUNCTION__, strBuffer);
+							Logger::getLogger()->setMinLevel("warning");
+
+
+							// FIXME_I:
+							if (PyDict_Check(dict)){
+
+								//# FIXME_I
+								Logger::getLogger()->setMinLevel("debug");
+								Logger::getLogger()->debug("xxx2 %s - bk3.01 - dict ", __FUNCTION__);
+								Logger::getLogger()->setMinLevel("warning");
+
+							} else {
+								//# FIXME_I
+								Logger::getLogger()->setMinLevel("debug");
+								Logger::getLogger()->debug("xxx2 %s - bk3.01 - NO dict ", __FUNCTION__);
+								Logger::getLogger()->setMinLevel("warning");
+
+							}
+
+							return NULL;
+						}
+					} catch (const std::exception &e)
+					{
+						Logger::getLogger()->error("xxx %s - exception PyArg_ParseTuple :%s:", __FUNCTION__, e.what());
 					}
-				} else if (!PyDict_Check(pReturn)) {
+
 
 					// FIXME_I:
-					m_logger->error("xxx2 Return from Python convert function is neither a DICT object or a TUPLE");
-					return NULL;
+					if (PyDict_Check(dict)){
+
+						//# FIXME_I
+						Logger::getLogger()->setMinLevel("debug");
+						Logger::getLogger()->debug("xxx2 %s - bk3.01 - dict ", __FUNCTION__);
+						Logger::getLogger()->setMinLevel("warning");
+
+					} else {
+						//# FIXME_I
+						Logger::getLogger()->setMinLevel("debug");
+						Logger::getLogger()->debug("xxx2 %s - bk3.01 - NO dict ", __FUNCTION__);
+						Logger::getLogger()->setMinLevel("warning");
+
+					}
+
+
+					asset= strBuffer;
+
+					//# FIXME_I
+					Logger::getLogger()->setMinLevel("debug");
+					Logger::getLogger()->debug("xxx2 %s - bk3 :%s: ", __FUNCTION__, asset.c_str());
+					Logger::getLogger()->setMinLevel("warning");
+
+
+					// FIXME_I:
+					pValue = dict;
+
+//					if (!PyDict_Check(dict)){
+//
+//						// FIXME_I:
+//						m_logger->error("xxx2 Return from Python convert function is not a DICT object");
+//						return NULL;
+//					} else {
+//						//# FIXME_I
+//						Logger::getLogger()->setMinLevel("debug");
+//						Logger::getLogger()->debug("xxx2 %s - bk4 ", __FUNCTION__);
+//						Logger::getLogger()->setMinLevel("warning");
+//
+//						pValue = dict;
+//					}
+
+					//# FIXME_I
+					Logger::getLogger()->setMinLevel("debug");
+					Logger::getLogger()->debug("xxx2 %s - bk3.1 :%s: ", __FUNCTION__, asset.c_str());
+					Logger::getLogger()->setMinLevel("warning");
+
+
+				} else {
+					//# FIXME_I
+					Logger::getLogger()->setMinLevel("debug");
+					Logger::getLogger()->debug("xxx2 %s - bk0.4.1 ", __FUNCTION__);
+					Logger::getLogger()->setMinLevel("warning");
+
+
+					pValue = pReturn;
 				}
+
+				//# FIXME_I
+				Logger::getLogger()->setMinLevel("debug");
+				Logger::getLogger()->debug("xxx2 %s - bk0.4.2 ", __FUNCTION__);
+				Logger::getLogger()->setMinLevel("warning");
+
+
 			}
+
+			if (!PyDict_Check(dict)){
+
+				//# FIXME_I
+				Logger::getLogger()->setMinLevel("debug");
+				Logger::getLogger()->debug("xxx2 %s - bk0.3 ", __FUNCTION__);
+				Logger::getLogger()->setMinLevel("warning");
+
+
+				// FIXME_I:
+				m_logger->error("xxx2 Return from Python convert function is neither a DICT object or a TUPLE");
+				return NULL;
+			}
+
+			//# FIXME_I
+			Logger::getLogger()->setMinLevel("debug");
+			Logger::getLogger()->debug("xxx2 %s - BRK 1.3 ", __FUNCTION__);
+			Logger::getLogger()->setMinLevel("warning");
+
 			doc = new Document();
 			auto& alloc = doc->GetAllocator();
 			doc->SetObject();
 			PyObject *key, *value;
 			Py_ssize_t pos = 0;
-			while (PyDict_Next(pReturn, &pos, &key, &value))
+			while (PyDict_Next(pValue, &pos, &key, &value))
 			{
 				const char *name = PyUnicode_Check(key) ? 
 					PyUnicode_AsUTF8(key)
@@ -236,7 +366,10 @@ Document *doc = NULL;
 					m_logger->error("Not adding data for '%s', unable to map type", name);
 				}
 			}
-			Py_CLEAR(pReturn);
+			//Py_CLEAR(pReturn);
+			// FIXME_I:
+			//Py_CLEAR(dict);
+
 		}
 		else
 		{

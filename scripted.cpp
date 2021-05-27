@@ -35,6 +35,7 @@ char *payloadptr;
 	MQTTClient_freeMessage(&message);
 	MQTTScripted *mqtt = (MQTTScripted *)context;
 	mqtt->processMessage(topicName, buf);
+	// FIXME_I:
 	MQTTClient_free(topicName);
 	free(buf);
 	return 1;
@@ -234,7 +235,7 @@ Document doc;
 
 	//# FIXME_I
 	Logger::getLogger()->setMinLevel("debug");
-	Logger::getLogger()->debug("xxx2 %s - ", __FUNCTION__);
+	Logger::getLogger()->debug("xxx2 %s - start exec ", __FUNCTION__);
 	Logger::getLogger()->setMinLevel("warning");
 
 	Logger::getLogger()->debug("Processing MQTT message: %s with script %s", message.c_str(), m_script.c_str());
@@ -322,6 +323,14 @@ Document doc;
 		}
 		// Give the message to the script to process
 		Document *d = m_python->execute(message, topic, asset);
+
+
+		//# FIXME_I
+		Logger::getLogger()->setMinLevel("debug");
+		Logger::getLogger()->debug("xxx2 %s - back 1 v2", __FUNCTION__);
+		Logger::getLogger()->setMinLevel("warning");
+
+		// FIXME_I:
 		if (d)
 		{
 			vector<Datapoint *> points;
@@ -364,4 +373,10 @@ Document doc;
 			delete d;
 		}
 	}
+
+	//# FIXME_I
+	Logger::getLogger()->setMinLevel("debug");
+	Logger::getLogger()->debug("xxx2 %s - back 2", __FUNCTION__);
+	Logger::getLogger()->setMinLevel("warning");
+
 }
