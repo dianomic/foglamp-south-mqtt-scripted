@@ -18,7 +18,7 @@ using namespace std;
 using namespace rapidjson;
 
 /**
- * Callback when an MQTT message arrives fo rthe topic to which we are subscribed
+ * Callback when an MQTT message arrives for the topic to which we are subscribed
  */
 int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *message)
 {
@@ -33,9 +33,9 @@ char *payloadptr;
 	}
 	buf[message->payloadlen] = 0;
 	MQTTClient_freeMessage(&message);
-	MQTTClient_free(topicName);
 	MQTTScripted *mqtt = (MQTTScripted *)context;
 	mqtt->processMessage(topicName, buf);
+	MQTTClient_free(topicName);
 	free(buf);
 	return 1;
 }
@@ -54,17 +54,19 @@ void connlost(void *context, char *cause)
  *
  * @param config	The configuration category
  */
-MQTTScripted::MQTTScripted(ConfigCategory *config)
+MQTTScripted::MQTTScripted(ConfigCategory *config) : m_python(NULL), m_restart(false)
 {
+	m_name = config->getName();
 	m_logger = Logger::getLogger();
 	m_asset = config->getValue("asset");
 	m_broker = config->getValue("broker");
 	m_topic = config->getValue("topic");
 	m_script = config->getItemAttribute("script", ConfigCategory::FILE_ATTR);
+	m_content = config->getValue("script");
 	m_clientID = config->getName();
 	m_qos = 1;
-	m_python = new PythonScript(config->getName());
-	if (m_python && m_script.empty() == false)
+	m_python = new PythonScript(m_name);
+	if (m_python && m_script.empty() == false && m_content.empty() == false)
 	{
 		m_python->setScript(m_script);
 	}
@@ -171,12 +173,52 @@ void MQTTScripted::reconfigure(const ConfigCategory& category)
 {
 	lock_guard<mutex> guard(m_mutex);
 	m_asset = category.getValue("asset");
-	m_broker = category.getValue("broker");
-	m_topic = category.getValue("topic");
-	m_script = category.getValue("script");
-	if (m_python && m_script.empty() == false)
+	string broker = category.getValue("broker");
+	bool resubscribe = false;
+	if (broker.compare(m_broker))
 	{
-		m_python->setScript(m_script);
+		resubscribe = true;
+	}
+	m_broker = broker;
+	string topic = category.getValue("topic");
+	if (topic.compare(m_topic))
+	{
+		resubscribe = true;
+	}
+	m_topic = topic;
+
+	if (resubscribe)
+	{
+		Logger::getLogger()->info("Resubscribing to MQTT broker followign reconfiguration");
+		// The MQTT broker has changed
+		(void)MQTTClient_disconnect(m_client, 10000);
+		MQTTClient_destroy(&m_client);
+
+
+		// Connect to the new MQTT broker
+		MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
+		MQTTClient_deliveryToken token;
+		int rc;
+
+		if ((rc = MQTTClient_create(&m_client, m_broker.c_str(), m_clientID.c_str(),
+			MQTTCLIENT_PERSISTENCE_NONE, NULL)) != MQTTCLIENT_SUCCESS)
+		{
+			Logger::getLogger()->error("Failed to create client, return code %d\n", rc);
+		}
+		else
+		{
+			MQTTClient_setCallbacks(m_client, this, connlost, msgarrvd, NULL);
+			reconnect();
+		}
+	}
+
+	m_script = category.getItemAttribute("script", ConfigCategory::FILE_ATTR);
+	string content = category.getValue("script");
+	if (m_content.compare(content))	// Script content has changed
+	{
+		Logger::getLogger()->info("Reconfiguration has changed the Python script");
+		m_restart = true;
+		m_content = content;
 	}
 }
 
@@ -249,8 +291,19 @@ Document doc;
 	}
 	else
 	{
+		if (m_restart)
+		{
+			Logger::getLogger()->info("Script content has change, reloading");
+			delete m_python;
+			m_python = new PythonScript(m_name);
+			if (m_python && m_script.empty() == false)
+			{
+				m_python->setScript(m_script);
+			}
+			m_restart = false;
+		}
 		// Give the message to the script to process
-		Document *d = m_python->execute(message);
+		Document *d = m_python->execute(message, topic);
 		if (d)
 		{
 			vector<Datapoint *> points;

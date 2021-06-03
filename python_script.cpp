@@ -20,7 +20,7 @@ using namespace rapidjson;
  *
  * @param name	The name of the south service
  */
-PythonScript::PythonScript(const string& name) : m_init(false), m_pFunc(NULL)
+PythonScript::PythonScript(const string& name) : m_init(false), m_pFunc(NULL), m_libpythonHandle(NULL), m_pModule(NULL)
 {
 	m_logger = Logger::getLogger();
 	wchar_t *programName = Py_DecodeLocale(name.c_str(), NULL);
@@ -67,13 +67,15 @@ PythonScript::~PythonScript()
 {
 	if (m_init)
 	{
-		PyGILState_STATE state = PyGILState_Ensure();
-		Py_Finalize();
+		if (Py_IsInitialized())
+		{
+			PyGILState_STATE state = PyGILState_Ensure();
+			Py_Finalize();
+		}
 		if (m_libpythonHandle)
 		{
 			dlclose(m_libpythonHandle);
 		}
-		PyGILState_Release(state);
 	}
 }
 
@@ -104,21 +106,26 @@ bool PythonScript::setScript(const string& name)
 		m_script = m_script.substr(0, end);
 	}
 	PyGILState_STATE state = PyGILState_Ensure();
-	if (m_pFunc)
-	{
-		Py_DECREF(m_pFunc);
-	}
 	PyObject *pName = PyUnicode_FromString((char *)m_script.c_str());
-	PyObject *pModule = PyImport_Import(pName);
-	if (!pModule)
+	if (m_pModule)
+		m_pModule = PyImport_ReloadModule(m_pModule);
+	else
+		m_pModule = PyImport_Import(pName);
+	if (!m_pModule)
 	{
 		m_logger->error("Failed to import script %s", m_script.c_str());
-		return NULL;
+		return false;
 	}
-	PyObject *pDict = PyModule_GetDict(pModule);
-	m_pFunc = PyDict_GetItemString(pDict, (char*)"convert");
-	Py_DECREF(pDict);
-	Py_DECREF(pModule);
+	PyObject *pDict = PyModule_GetDict(m_pModule);
+	if (pDict)
+	{
+		m_pFunc = PyDict_GetItemString(pDict, (char*)"convert");
+		Py_DECREF(pDict);
+	}
+	else
+	{
+		m_logger->error("Unable to extract dictionary from imported Python module");
+	}
 	PyGILState_Release(state);
 	return true;
 }
@@ -131,7 +138,7 @@ bool PythonScript::setScript(const string& name)
  *
  * @param message	The MQTT message string
  */
-Document *PythonScript::execute(const string& message)
+Document *PythonScript::execute(const string& message, const string& topic)
 {
 Document *doc = NULL;
 
@@ -140,7 +147,7 @@ Document *doc = NULL;
 	{
 		if (PyCallable_Check(m_pFunc))
 		{
-			PyObject *pReturn = PyObject_CallFunction(m_pFunc, "s", message.c_str());
+			PyObject *pReturn = PyObject_CallFunction(m_pFunc, "ss", message.c_str(), topic.c_str());
 			if (!pReturn)
 			{
 				m_logger->error("Python convert function failed to return data");
@@ -163,7 +170,7 @@ Document *doc = NULL;
 					: PyBytes_AsString(key);
 				if (PyLong_Check(value) || PyLong_Check(value))
 				{
-					doc->AddMember(Value(name, alloc), Value(PyLong_AsLong(value)), alloc);
+					doc->AddMember(Value(name, alloc), Value((int64_t)PyLong_AsLong(value)), alloc);
 				}
 				else if (PyFloat_Check(value))
 				{
@@ -173,9 +180,13 @@ Document *doc = NULL;
 				{
 					doc->AddMember(Value(name, alloc),Value(PyBytes_AsString(value), alloc), alloc);
 				}
+				else if (PyUnicode_Check(value))
+				{
+					doc->AddMember(Value(name, alloc),Value(PyUnicode_AsUTF8(value), alloc), alloc);
+				}
 				else
 				{
-					m_logger->error("Not adding data for %s, unable to map type", name);
+					m_logger->error("Not adding data for '%s', unable to map type", name);
 				}
 			}
 			Py_CLEAR(pReturn);

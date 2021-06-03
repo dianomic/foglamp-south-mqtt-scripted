@@ -19,13 +19,14 @@ class PythonScript {
 		PythonScript(const std::string& name);
 		~PythonScript();
 		bool			setScript(const std::string& file);
-		rapidjson::Document	*execute(const std::string& message);
+		rapidjson::Document	*execute(const std::string& message, const std::string& topic);
 	private:
 		std::string		m_script;
 		bool			m_init;
 		Logger			*m_logger;
 		void			*m_libpythonHandle;
 		PyObject		*m_pFunc;
+		PyObject		*m_pModule;
 };
 
 #endif
