@@ -107,12 +107,6 @@ bool PythonScript::setScript(const string& name)
 	}
 	PyGILState_STATE state = PyGILState_Ensure();
 
-	//# FIXME_I
-	Logger::getLogger()->setMinLevel("debug");
-	Logger::getLogger()->debug("xxx2 %s - m_script :%s:", __FUNCTION__, m_script.c_str());
-	Logger::getLogger()->setMinLevel("warning");
-
-
 	PyObject *pName = PyUnicode_FromString((char *)m_script.c_str());
 	if (m_pModule)
 		m_pModule = PyImport_ReloadModule(m_pModule);
@@ -137,6 +131,22 @@ bool PythonScript::setScript(const string& name)
 	return true;
 }
 
+void PythonScript::freeMemObj(PyObject *obj1)
+{
+	if (obj1 != NULL)
+		Py_CLEAR (obj1);
+}
+
+void PythonScript::freeMemAll(PyObject *obj1, char *str, PyObject *obj3)
+{
+	freeMemObj (obj1);
+
+	if (str != NULL)
+		Py_CLEAR (str);
+
+	freeMemObj (obj3);
+}
+
 /**
  * Execute the mapping function. This function is always called
  * convert and is passed the MQTT message as a string. It must return
@@ -148,198 +158,76 @@ bool PythonScript::setScript(const string& name)
 Document *PythonScript::execute(const string& message, const string& topic, string& asset)
 {
 Document *doc = NULL;
-	// FIXME_I:
+
 	char *strBuffer;
-
-	// FIXME_I:
-	strBuffer = (char *) malloc(1000);
-
-	//# FIXME_I
-	Logger::getLogger()->setMinLevel("debug");
-	Logger::getLogger()->debug("xxx2 %s - v2", __FUNCTION__);
-	Logger::getLogger()->setMinLevel("warning");
 
 	PyGILState_STATE state = PyGILState_Ensure();
 	if (m_pFunc)
 	{
-
-		//# FIXME_I
-		Logger::getLogger()->setMinLevel("debug");
-		Logger::getLogger()->debug("xxx2 %s - BRK 1 v2 ", __FUNCTION__);
-		Logger::getLogger()->setMinLevel("warning");
-
 		if (PyCallable_Check(m_pFunc))
 		{
-			//# FIXME_I
-			Logger::getLogger()->setMinLevel("debug");
-			Logger::getLogger()->debug("xxx2 %s - BRK 1.1 ", __FUNCTION__);
-			Logger::getLogger()->setMinLevel("warning");
-
-
-			// FIXME_I:
 			PyObject *dict;
 			PyObject *pValue;
 			PyObject *pReturn = PyObject_CallFunction(m_pFunc, "ss", message.c_str(), topic.c_str());
 
-			//# FIXME_I
-			Logger::getLogger()->setMinLevel("debug");
-			Logger::getLogger()->debug("xxx2 %s - BRK 1.2  %s %s", __FUNCTION__,  message.c_str(), topic.c_str());
-			Logger::getLogger()->setMinLevel("warning");
-
 			if (!pReturn)
 			{
-				m_logger->error("xxx2 Python convert function failed to return data");
+				m_logger->error("Python convert function failed to return data");
 				return NULL;
 			}
 			else
 			{
-				//# FIXME_I
-				Logger::getLogger()->setMinLevel("debug");
-				Logger::getLogger()->debug("xxx2 %s - bk2 v2", __FUNCTION__);
-				Logger::getLogger()->setMinLevel("warning");
-
-				//# FIXME_I
-				Logger::getLogger()->setMinLevel("debug");
-				Logger::getLogger()->debug("xxx2 %s - bk0.1 ", __FUNCTION__);
-				Logger::getLogger()->setMinLevel("warning");
-
-				// FIXME_I:
 				if (PyTuple_Check(pReturn)) {
 
-					//# FIXME_I
-					Logger::getLogger()->setMinLevel("debug");
-					Logger::getLogger()->debug("xxx2 %s - bk0.2 ", __FUNCTION__);
-					Logger::getLogger()->setMinLevel("warning");
+					if (PyArg_ParseTuple(pReturn, "s|O", &strBuffer, &dict) == false) {
 
-
-					//# FIXME_I
-					Logger::getLogger()->setMinLevel("debug");
-					Logger::getLogger()->debug("xxx2 %s - bk2.2 ", __FUNCTION__);
-					Logger::getLogger()->setMinLevel("warning");
-
-					try {
-
-						if (PyArg_ParseTuple(pReturn, "so", &strBuffer, &dict) == false) {
-
-							//# FIXME_I
-							Logger::getLogger()->setMinLevel("debug");
-							Logger::getLogger()->error("xxx2 %s - bk3 PyArg_ParseTuple :%s: ", __FUNCTION__, strBuffer);
-							Logger::getLogger()->setMinLevel("warning");
-
-
-							// FIXME_I:
-							if (PyDict_Check(dict)){
-
-								//# FIXME_I
-								Logger::getLogger()->setMinLevel("debug");
-								Logger::getLogger()->debug("xxx2 %s - bk3.01 - dict ", __FUNCTION__);
-								Logger::getLogger()->setMinLevel("warning");
-
-							} else {
-								//# FIXME_I
-								Logger::getLogger()->setMinLevel("debug");
-								Logger::getLogger()->debug("xxx2 %s - bk3.01 - NO dict ", __FUNCTION__);
-								Logger::getLogger()->setMinLevel("warning");
-
-							}
-
-							return NULL;
-						}
-					} catch (const std::exception &e)
-					{
-						Logger::getLogger()->error("xxx %s - exception PyArg_ParseTuple :%s:", __FUNCTION__, e.what());
+						m_logger->error("Expected a STRING and a DICT returned by the Python convert function");
+						freeMemAll(pReturn, strBuffer, dict);
+						return NULL;
 					}
 
+					if (strBuffer == NULL){
 
-					// FIXME_I:
-					if (PyDict_Check(dict)){
+						m_logger->error("Expected a STRING as the first value returned by the Python convert function");
+						freeMemAll(pReturn, strBuffer, dict);
+						return NULL;
 
-						//# FIXME_I
-						Logger::getLogger()->setMinLevel("debug");
-						Logger::getLogger()->debug("xxx2 %s - bk3.01 - dict ", __FUNCTION__);
-						Logger::getLogger()->setMinLevel("warning");
+					} else if (dict == NULL){
+
+						m_logger->error("Expected a DICT as the second value returned by the Python convert function");
+						freeMemAll(pReturn, strBuffer, dict);
+						return NULL;
 
 					} else {
-						//# FIXME_I
-						Logger::getLogger()->setMinLevel("debug");
-						Logger::getLogger()->debug("xxx2 %s - bk3.01 - NO dict ", __FUNCTION__);
-						Logger::getLogger()->setMinLevel("warning");
+						if (! PyDict_Check(dict)){
 
+							m_logger->error("Expected a DICT as the second value returned by the Python convert function");
+							freeMemAll(pReturn, strBuffer, dict);
+							return NULL;
+						}
 					}
 
-
-					asset= strBuffer;
-
-					//# FIXME_I
-					Logger::getLogger()->setMinLevel("debug");
-					Logger::getLogger()->debug("xxx2 %s - bk3 :%s: ", __FUNCTION__, asset.c_str());
-					Logger::getLogger()->setMinLevel("warning");
-
-
-					// FIXME_I:
+					asset = strBuffer;
 					pValue = dict;
 
-//					if (!PyDict_Check(dict)){
-//
-//						// FIXME_I:
-//						m_logger->error("xxx2 Return from Python convert function is not a DICT object");
-//						return NULL;
-//					} else {
-//						//# FIXME_I
-//						Logger::getLogger()->setMinLevel("debug");
-//						Logger::getLogger()->debug("xxx2 %s - bk4 ", __FUNCTION__);
-//						Logger::getLogger()->setMinLevel("warning");
-//
-//						pValue = dict;
-//					}
-
-					//# FIXME_I
-					Logger::getLogger()->setMinLevel("debug");
-					Logger::getLogger()->debug("xxx2 %s - bk3.1 :%s: ", __FUNCTION__, asset.c_str());
-					Logger::getLogger()->setMinLevel("warning");
-
-
 				} else {
-					//# FIXME_I
-					Logger::getLogger()->setMinLevel("debug");
-					Logger::getLogger()->debug("xxx2 %s - bk0.4.1 ", __FUNCTION__);
-					Logger::getLogger()->setMinLevel("warning");
-
-
+					if (!PyDict_Check(pReturn))
+					{
+						m_logger->error("Return from Python convert function is not a DICT object");
+						freeMemAll(pReturn, NULL, NULL);
+						return NULL;
+					}
 					pValue = pReturn;
 				}
 
-				//# FIXME_I
-				Logger::getLogger()->setMinLevel("debug");
-				Logger::getLogger()->debug("xxx2 %s - bk0.4.2 ", __FUNCTION__);
-				Logger::getLogger()->setMinLevel("warning");
-
-
 			}
-
-			if (!PyDict_Check(dict)){
-
-				//# FIXME_I
-				Logger::getLogger()->setMinLevel("debug");
-				Logger::getLogger()->debug("xxx2 %s - bk0.3 ", __FUNCTION__);
-				Logger::getLogger()->setMinLevel("warning");
-
-
-				// FIXME_I:
-				m_logger->error("xxx2 Return from Python convert function is neither a DICT object or a TUPLE");
-				return NULL;
-			}
-
-			//# FIXME_I
-			Logger::getLogger()->setMinLevel("debug");
-			Logger::getLogger()->debug("xxx2 %s - BRK 1.3 ", __FUNCTION__);
-			Logger::getLogger()->setMinLevel("warning");
 
 			doc = new Document();
 			auto& alloc = doc->GetAllocator();
 			doc->SetObject();
 			PyObject *key, *value;
 			Py_ssize_t pos = 0;
+
 			while (PyDict_Next(pValue, &pos, &key, &value))
 			{
 				const char *name = PyUnicode_Check(key) ? 
@@ -366,10 +254,7 @@ Document *doc = NULL;
 					m_logger->error("Not adding data for '%s', unable to map type", name);
 				}
 			}
-			//Py_CLEAR(pReturn);
-			// FIXME_I:
-			//Py_CLEAR(dict);
-
+			freeMemAll(pReturn, strBuffer, dict);
 		}
 		else
 		{
@@ -381,13 +266,6 @@ Document *doc = NULL;
 	{
 		m_logger->fatal("Unable to create Python reference to function \"convert\"");
 	}
-
-
-	//# FIXME_I
-	Logger::getLogger()->setMinLevel("debug");
-	Logger::getLogger()->debug("xxx2 %s - BRK 2 ", __FUNCTION__);
-	Logger::getLogger()->setMinLevel("warning");
-
 
 	PyGILState_Release(state);
 	return doc;

@@ -35,7 +35,6 @@ char *payloadptr;
 	MQTTClient_freeMessage(&message);
 	MQTTScripted *mqtt = (MQTTScripted *)context;
 	mqtt->processMessage(topicName, buf);
-	// FIXME_I:
 	MQTTClient_free(topicName);
 	free(buf);
 	return 1;
@@ -233,19 +232,9 @@ void MQTTScripted::processMessage(const string& topic,const  string& message)
 {
 Document doc;
 
-	//# FIXME_I
-	Logger::getLogger()->setMinLevel("debug");
-	Logger::getLogger()->debug("xxx2 %s - start exec ", __FUNCTION__);
-	Logger::getLogger()->setMinLevel("warning");
-
 	Logger::getLogger()->debug("Processing MQTT message: %s with script %s", message.c_str(), m_script.c_str());
 	if (m_script.empty() || m_script.compare("\"\"") == 0)
 	{
-		//# FIXME_I
-		Logger::getLogger()->setMinLevel("debug");
-		Logger::getLogger()->debug("xxx2 %s - brk 1", __FUNCTION__);
-		Logger::getLogger()->setMinLevel("warning");
-
 		// Message should be JSON
 		doc.Parse(message.c_str());
 		if (doc.HasParseError() == false && doc.IsObject())
@@ -302,13 +291,7 @@ Document doc;
 	}
 	else
 	{
-		// FIXME_I:
 		string asset;
-
-		//# FIXME_I
-		Logger::getLogger()->setMinLevel("debug");
-		Logger::getLogger()->debug("xxx2 %s - brk 2 :%s: :%s:", __FUNCTION__ , message.c_str(), topic.c_str());
-		Logger::getLogger()->setMinLevel("warning");
 
 		if (m_restart)
 		{
@@ -324,13 +307,6 @@ Document doc;
 		// Give the message to the script to process
 		Document *d = m_python->execute(message, topic, asset);
 
-
-		//# FIXME_I
-		Logger::getLogger()->setMinLevel("debug");
-		Logger::getLogger()->debug("xxx2 %s - back 1 v2", __FUNCTION__);
-		Logger::getLogger()->setMinLevel("warning");
-
-		// FIXME_I:
 		if (d)
 		{
 			vector<Datapoint *> points;
@@ -356,27 +332,16 @@ Document doc;
 					points.push_back(new Datapoint( m.name.GetString(), dpv));
 				}
 			}
-			// FIXME_I:
 			if (asset.empty()) {
 
 				asset = m_asset;
 			}
 
-			//# FIXME_I
-			Logger::getLogger()->setMinLevel("debug");
-			Logger::getLogger()->debug("xxx2 %s - brk 3 msg :%s: topic :%s: asset :%s: ", __FUNCTION__ , message.c_str(), topic.c_str(), asset.c_str() );
-			Logger::getLogger()->setMinLevel("warning");
-
+			Logger::getLogger()->debug("%s - message :%s: topic :%s: asset :%s: ", __FUNCTION__ , message.c_str(), topic.c_str(), asset.c_str() );
 			Reading reading(asset, points);
 			(*m_ingest)(m_data, reading);
 
 			delete d;
 		}
 	}
-
-	//# FIXME_I
-	Logger::getLogger()->setMinLevel("debug");
-	Logger::getLogger()->debug("xxx2 %s - back 2", __FUNCTION__);
-	Logger::getLogger()->setMinLevel("warning");
-
 }
