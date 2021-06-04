@@ -181,27 +181,27 @@ Document *doc = NULL;
 
 					if (PyArg_ParseTuple(pReturn, "s|O", &strBuffer, &dict) == false) {
 
-						m_logger->error("Expected a STRING and a DICT returned by the Python convert function");
+						m_logger->error("a STRING and a DICT are expected as return values from the Python convert function");
 						freeMemAll(pReturn, strBuffer, dict);
 						return NULL;
 					}
 
 					if (strBuffer == NULL){
 
-						m_logger->error("Expected a STRING as the first value returned by the Python convert function");
+						m_logger->error("a STRING is expected as the first value returned by the Python convert function");
 						freeMemAll(pReturn, strBuffer, dict);
 						return NULL;
 
 					} else if (dict == NULL){
 
-						m_logger->error("Expected a DICT as the second value returned by the Python convert function");
+						m_logger->error("a DICT is expected as the second value returned by the Python convert function");
 						freeMemAll(pReturn, strBuffer, dict);
 						return NULL;
 
 					} else {
 						if (! PyDict_Check(dict)){
 
-							m_logger->error("Expected a DICT as the second value returned by the Python convert function");
+							m_logger->error("a DICT is expected as the second value returned by the Python convert function");
 							freeMemAll(pReturn, strBuffer, dict);
 							return NULL;
 						}
