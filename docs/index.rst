@@ -40,7 +40,7 @@ The script could return either one or two values.
 The script should return the JSON document as a Python DICT in the case of a single value.
 
 The script should return a string and a JSON document as a Python DICT in the case of two values,
-the first value returned will be considered as the asset name.
+the first of these values is the name of the asset to use and overrides the default asset naming defined in the plugin configuration.
 
 First case sample:
 
