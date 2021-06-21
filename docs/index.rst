@@ -19,8 +19,7 @@ the payload.
 
 If the message format is not a simple JSON document or a single value,
 or is in some other format then a Python script should be provided that
-turns the message into a JSON format. The script should return the JSON
-document as a Python DICT.
+turns the message into a JSON format.
 
 An example script, assuming the payload in the message is simply a value, might be a follows
 
@@ -36,6 +35,27 @@ ingest into FogLAMP in this case is assumed to be a floating point value.
 The example above of course is unnecessary as the plugin can consume this
 data without the need of a script.
 
+The script could return either one or two values.
+
+The script should return the JSON document as a Python DICT in the case of a single value.
+
+The script should return a string and a JSON document as a Python DICT in the case of two values,
+the first of these values is the name of the asset to use and overrides the default asset naming defined in the plugin configuration.
+
+First case sample:
+
+.. code-block:: Python
+
+    def convert(message, topic):
+        return {"temperature_1": 10.2}
+
+Second case sample:
+
+.. code-block:: Python
+
+    def convert(message, topic):
+        return "ExternalTEMP",  {"temperature_3": 11.3}
+
 Configuration
 -------------
 
@@ -45,7 +65,7 @@ When adding a south service with this plugin the same flow is used as with any o
 | |mqtt_01| |
 +-----------+
 
-  - **Asset Name**: The name of the asset the plugin will create for each message.
+  - **Asset Name**: The name of the asset the plugin will create for each message, unless the convert function returns an explict asset name to be used.
 
   - **MQTT Broker**: The IP address/hostname of the MQTT broker to use. Note FogLAMP requires an external MQTT broker is run currently and does not provide an internal broker in the current release.
 

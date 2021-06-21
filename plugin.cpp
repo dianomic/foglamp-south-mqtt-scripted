@@ -101,7 +101,6 @@ PLUGIN_HANDLE plugin_init(ConfigCategory *config)
 {
 MQTTScripted	*mqtt;
 
-
 	mqtt = new MQTTScripted(config);
 	return (PLUGIN_HANDLE)mqtt;
 }

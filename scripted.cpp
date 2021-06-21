@@ -291,6 +291,8 @@ Document doc;
 	}
 	else
 	{
+		string asset;
+
 		if (m_restart)
 		{
 			Logger::getLogger()->info("Script content has change, reloading");
@@ -303,7 +305,8 @@ Document doc;
 			m_restart = false;
 		}
 		// Give the message to the script to process
-		Document *d = m_python->execute(message, topic);
+		Document *d = m_python->execute(message, topic, asset);
+
 		if (d)
 		{
 			vector<Datapoint *> points;
@@ -329,7 +332,13 @@ Document doc;
 					points.push_back(new Datapoint( m.name.GetString(), dpv));
 				}
 			}
-			Reading reading(m_asset, points);
+			if (asset.empty()) {
+
+				asset = m_asset;
+			}
+
+			Logger::getLogger()->debug("%s - message :%s: topic :%s: asset :%s: ", __FUNCTION__ , message.c_str(), topic.c_str(), asset.c_str() );
+			Reading reading(asset, points);
 			(*m_ingest)(m_data, reading);
 
 			delete d;

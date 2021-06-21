@@ -106,6 +106,7 @@ bool PythonScript::setScript(const string& name)
 		m_script = m_script.substr(0, end);
 	}
 	PyGILState_STATE state = PyGILState_Ensure();
+
 	PyObject *pName = PyUnicode_FromString((char *)m_script.c_str());
 	if (m_pModule)
 		m_pModule = PyImport_ReloadModule(m_pModule);
@@ -130,6 +131,22 @@ bool PythonScript::setScript(const string& name)
 	return true;
 }
 
+void PythonScript::freeMemObj(PyObject *obj1)
+{
+	if (obj1 != NULL)
+		Py_CLEAR (obj1);
+}
+
+void PythonScript::freeMemAll(PyObject *obj1, char *str, PyObject *obj3)
+{
+	freeMemObj (obj1);
+
+	if (str != NULL)
+		Py_CLEAR (str);
+
+	freeMemObj (obj3);
+}
+
 /**
  * Execute the mapping function. This function is always called
  * convert and is passed the MQTT message as a string. It must return
@@ -138,32 +155,80 @@ bool PythonScript::setScript(const string& name)
  *
  * @param message	The MQTT message string
  */
-Document *PythonScript::execute(const string& message, const string& topic)
+Document *PythonScript::execute(const string& message, const string& topic, string& asset)
 {
 Document *doc = NULL;
+
+	char *strBuffer;
 
 	PyGILState_STATE state = PyGILState_Ensure();
 	if (m_pFunc)
 	{
 		if (PyCallable_Check(m_pFunc))
 		{
+			PyObject *dict;
+			PyObject *pValue;
 			PyObject *pReturn = PyObject_CallFunction(m_pFunc, "ss", message.c_str(), topic.c_str());
+
 			if (!pReturn)
 			{
 				m_logger->error("Python convert function failed to return data");
 				return NULL;
 			}
-			else if (!PyDict_Check(pReturn))
+			else
 			{
-				m_logger->error("Return from Python convert function is not a DICT object");
-				return NULL;
+				if (PyTuple_Check(pReturn)) {
+
+					if (PyArg_ParseTuple(pReturn, "s|O", &strBuffer, &dict) == false) {
+
+						m_logger->error("a STRING and a DICT are expected as return values from the Python convert function");
+						freeMemAll(pReturn, strBuffer, dict);
+						return NULL;
+					}
+
+					if (strBuffer == NULL){
+
+						m_logger->error("a STRING is expected as the first value returned by the Python convert function");
+						freeMemAll(pReturn, strBuffer, dict);
+						return NULL;
+
+					} else if (dict == NULL){
+
+						m_logger->error("a DICT is expected as the second value returned by the Python convert function");
+						freeMemAll(pReturn, strBuffer, dict);
+						return NULL;
+
+					} else {
+						if (! PyDict_Check(dict)){
+
+							m_logger->error("a DICT is expected as the second value returned by the Python convert function");
+							freeMemAll(pReturn, strBuffer, dict);
+							return NULL;
+						}
+					}
+
+					asset = strBuffer;
+					pValue = dict;
+
+				} else {
+					if (!PyDict_Check(pReturn))
+					{
+						m_logger->error("Return from Python convert function is not a DICT object");
+						freeMemAll(pReturn, NULL, NULL);
+						return NULL;
+					}
+					pValue = pReturn;
+				}
+
 			}
+
 			doc = new Document();
 			auto& alloc = doc->GetAllocator();
 			doc->SetObject();
 			PyObject *key, *value;
 			Py_ssize_t pos = 0;
-			while (PyDict_Next(pReturn, &pos, &key, &value))
+
+			while (PyDict_Next(pValue, &pos, &key, &value))
 			{
 				const char *name = PyUnicode_Check(key) ? 
 					PyUnicode_AsUTF8(key)
@@ -189,7 +254,7 @@ Document *doc = NULL;
 					m_logger->error("Not adding data for '%s', unable to map type", name);
 				}
 			}
-			Py_CLEAR(pReturn);
+			freeMemAll(pReturn, strBuffer, dict);
 		}
 		else
 		{
@@ -201,6 +266,7 @@ Document *doc = NULL;
 	{
 		m_logger->fatal("Unable to create Python reference to function \"convert\"");
 	}
+
 	PyGILState_Release(state);
 	return doc;
 }
