@@ -273,7 +273,7 @@ Document doc;
 			int i;
 			bool nonNumeric = false;
 			for (i = 0; i < message.length(); i++)
-				if (message[i] != '.' && (message[i] < '0' || message[i] > '9'))
+				if (message[i] != '.' && (message[i] < '0' || message[i] > '9') && message[i] != '-')
 					nonNumeric = true;
 			if (!nonNumeric)
 			{
