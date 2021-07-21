@@ -10,6 +10,7 @@
 #include <python_script.h>
 #include <utils.h>
 #include <dlfcn.h>
+#include "plugin_api.h"
 
 using namespace std;
 using namespace rapidjson;
