@@ -28,6 +28,12 @@ include_directories(${CMAKE_BINARY_DIR})
 # Set plugin type (south, north, filter)
 set(PLUGIN_TYPE "south")
 
+# Fetch OS RELEASE CODENAME (i.e stretch, buster, xenial)
+execute_process(COMMAND lsb_release -cs
+    OUTPUT_VARIABLE RELEASE_CODENAME
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
 # Add here all needed FogLAMP libraries as list
 set(NEEDED_FOGLAMP_LIBS common-lib)
 
@@ -66,6 +72,20 @@ if(${CMAKE_VERSION} VERSION_LESS "3.12.0")
     include_directories(${PYTHON_INCLUDE_DIRS})
 else()
     include_directories(${Python_INCLUDE_DIRS})
+endif()
+
+# Pass RELEASE_CODENAME to C++ build for "buster" only
+if (RELEASE_CODENAME)
+	if (${RELEASE_CODENAME} MATCHES "buster")
+		if(${CMAKE_VERSION} VERSION_LESS "3.12.0")
+			set(PY_LIB "lib${PYTHON_LIBRARIES}.so")
+		else()
+			set(PY_LIB "${Python_LIBRARIES}")
+		endif()
+
+		add_definitions(-DPLUGIN_PYTHON_SHARED_LIBRARY=${PY_LIB})
+		message(STATUS "Setting -DPYTHON_SHARED_LIBRARY=${PY_LIB} for ${CMAKE_SYSTEM} on ${RELEASE_CODENAME}")
+	endif()
 endif()
 
 if(${CMAKE_VERSION} VERSION_LESS "3.12.0") 
