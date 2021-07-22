@@ -167,7 +167,14 @@ Document *doc = NULL;
 			PyObject *dict;
 			PyObject *assetObject;
 			PyObject *pValue;
-			PyObject *pReturn = PyObject_CallFunction(m_pFunc, "ss", message.c_str(), topic.c_str());
+			PyObject *pReturn;
+		       
+			try {
+				pReturn = PyObject_CallFunction(m_pFunc, "ss", message.c_str(), topic.c_str());
+			} catch (exception& e) {
+				m_logger->error("Python script execution failed: %s", e.what());
+				return NULL;
+			}
 
 			if (!pReturn)
 			{
