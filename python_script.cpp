@@ -72,22 +72,35 @@ PythonScript::PythonScript(const string& name) : m_init(false), m_pFunc(NULL), m
  */
 PythonScript::~PythonScript()
 {
+	m_logger->info("~PythonScript(): start");
 	if (m_init)
 	{
 		if (Py_IsInitialized())
 		{
+			m_logger->info("%s : %d", __FUNCTION__, __LINE__);
 			PyGILState_STATE state = PyGILState_Ensure();
-			Py_DECREF(m_pFunc);
-			Py_DECREF(m_pModule);
+			m_logger->info("%s : %d", __FUNCTION__, __LINE__);
+			m_logger->info("Py_REFCNT(m_pFunc)=%d", Py_REFCNT(m_pFunc));
+			m_logger->info("Py_REFCNT(m_pModule)=%d", Py_REFCNT(m_pModule));
+			m_logger->info("%s : %d", __FUNCTION__, __LINE__);
+			Py_CLEAR(m_pFunc);
+			m_logger->info("%s : %d", __FUNCTION__, __LINE__);
+			Py_CLEAR(m_pModule);
+			m_logger->info("%s : %d", __FUNCTION__, __LINE__);
+			// while (PyGC_Collect() > 0);
+			// m_logger->info("%s : %d", __FUNCTION__, __LINE__);
 			Py_Finalize();
 			m_logger->info("~PythonScript(): Py_Finalize done");
 		}
 		if (m_libpythonHandle)
 		{
+			m_logger->info("%s : %d", __FUNCTION__, __LINE__);
 			dlclose(m_libpythonHandle);
+			m_logger->info("%s : %d", __FUNCTION__, __LINE__);
 			m_logger->info("~PythonScript(): dl_close done");
 		}
 	}
+	m_logger->info("~PythonScript(): done");
 }
 
 /**
@@ -125,7 +138,7 @@ bool PythonScript::setScript(const string& name)
 		m_logger->info("PythonScript::setScript: before ReloadModule");
 		PyObject *new_module = PyImport_ReloadModule(m_pModule);
 		m_logger->info("PythonScript::setScript: line %d", __LINE__);
-		Py_DECREF(m_pModule);
+		Py_CLEAR(m_pModule);
 		m_logger->info("PythonScript::setScript: line %d", __LINE__);
         	m_pModule = new_module;
 		m_logger->info("PythonScript::setScript: after ReloadModule");
@@ -136,6 +149,7 @@ bool PythonScript::setScript(const string& name)
 		m_pModule = PyImport_Import(pName);
 		m_logger->info("PythonScript::setScript: after Import");
 	}
+	Py_CLEAR(pName);
 	if (!m_pModule)
 	{
 		m_logger->error("Failed to import script %s", m_script.c_str());
@@ -145,7 +159,7 @@ bool PythonScript::setScript(const string& name)
 	if (pDict)
 	{
 		m_pFunc = PyDict_GetItemString(pDict, (char*)"convert");
-		Py_DECREF(pDict);
+		Py_CLEAR(pDict);
 	}
 	else
 	{
@@ -189,10 +203,10 @@ Document *doc = NULL;
 		if (PyCallable_Check(m_pFunc))
 		{
 			m_logger->info("topic=%s, message=%s", topic.c_str(), message.c_str());
-			PyObject *dict;
-			PyObject *assetObject;
-			PyObject *pValue;
-			PyObject *pReturn;
+			PyObject *dict = NULL;
+			PyObject *assetObject = NULL;
+			PyObject *pValue = NULL;
+			PyObject *pReturn = NULL;
 		       
 			try {
 				pReturn = PyObject_CallFunction(m_pFunc, "ss", message.c_str(), topic.c_str());
@@ -221,6 +235,7 @@ Document *doc = NULL;
 					else
 						m_logger->info("%s : %d", __FUNCTION__, __LINE__);
 
+					m_logger->info("1. Py_REFCNT(assetObject)=%d", Py_REFCNT(assetObject));
 					if (assetObject == NULL){
 
 						m_logger->error("a STRING is expected as the first value returned by the Python convert function");
@@ -249,6 +264,7 @@ Document *doc = NULL;
 
 					const char *name = PyUnicode_Check(assetObject) ?
 						PyUnicode_AsUTF8(assetObject) : PyBytes_AsString(assetObject);
+					m_logger->info("2. Py_REFCNT(assetObject)=%d", Py_REFCNT(assetObject));
 					m_logger->info("asset = name = %s", name);
 					asset = name;
 					pValue = dict;
@@ -307,6 +323,10 @@ Document *doc = NULL;
 				}
 			}
 			m_logger->info("%s : %d", __FUNCTION__, __LINE__);
+			m_logger->info("Py_REFCNT(dict)=%d", Py_REFCNT(dict));
+			m_logger->info("Py_REFCNT(assetObject)=%d", Py_REFCNT(assetObject));
+			m_logger->info("pValue @ %p; Py_REFCNT(pValue)=%d", pValue, Py_REFCNT(pValue));
+			m_logger->info("pReturn @ %p; Py_REFCNT(pReturn)=%d", pReturn, Py_REFCNT(pReturn));
 			freeMemObj(pValue);
 			// m_logger->info("%s : %d", __FUNCTION__, __LINE__);
 			// freeMemObj(pReturn);
@@ -320,7 +340,6 @@ Document *doc = NULL;
 		{
 			m_logger->error("The convert function is not callable in the supplied Python script");
 		}
-
 	}
 	else
 	{
