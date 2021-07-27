@@ -43,7 +43,6 @@ PythonScript::PythonScript(const string& name) : m_init(false), m_pFunc(NULL), m
 #endif
 		Py_Initialize();
 		//PyEval_InitThreads(); // Initialize and acquire the global interpreter lock (GIL)
-		//m_logger->info("PythonScript c'tor: line %d", __LINE__);
 		PyThreadState* save = PyEval_SaveThread(); // release GIL
 		m_init = true;
 	}
@@ -175,7 +174,6 @@ Document *doc = NULL;
 	{
 		if (PyCallable_Check(m_pFunc))
 		{
-			m_logger->info("topic=%s, message=%s", topic.c_str(), message.c_str());
 			PyObject *dict = NULL;
 			PyObject *assetObject = NULL;
 			PyObject *pValue = NULL;
