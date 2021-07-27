@@ -295,7 +295,7 @@ Document doc;
 
 		if (m_restart)
 		{
-			Logger::getLogger()->info("Script content has change, reloading");
+			Logger::getLogger()->info("Script content has changed, reloading");
 			delete m_python;
 			m_python = new PythonScript(m_name);
 			if (m_python && m_script.empty() == false)

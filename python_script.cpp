@@ -35,14 +35,14 @@ PythonScript::PythonScript(const string& name) : m_init(false), m_pFunc(NULL), m
 		if (!openLibrary.empty())
 		{
 			m_libpythonHandle = dlopen(openLibrary.c_str(),
-						  RTLD_LAZY | RTLD_GLOBAL);
+						  RTLD_LAZY | RTLD_LOCAL);
 			m_logger->info("Pre-loading of library '%s' "
 						  "is needed on this system",
 						  openLibrary.c_str());
 		}
 #endif
 		Py_Initialize();
-		PyEval_InitThreads(); // Initialize and acquire the global interpreter lock (GIL)
+		//PyEval_InitThreads(); // Initialize and acquire the global interpreter lock (GIL)
 		PyThreadState* save = PyEval_SaveThread(); // release GIL
 		m_init = true;
 	}
@@ -71,6 +71,8 @@ PythonScript::~PythonScript()
 		if (Py_IsInitialized())
 		{
 			PyGILState_STATE state = PyGILState_Ensure();
+			Py_CLEAR(m_pFunc);
+			Py_CLEAR(m_pModule);
 			Py_Finalize();
 		}
 		if (m_libpythonHandle)
@@ -110,9 +112,16 @@ bool PythonScript::setScript(const string& name)
 
 	PyObject *pName = PyUnicode_FromString((char *)m_script.c_str());
 	if (m_pModule)
-		m_pModule = PyImport_ReloadModule(m_pModule);
+	{
+		PyObject *new_module = PyImport_ReloadModule(m_pModule);
+		Py_CLEAR(m_pModule);
+        	m_pModule = new_module;
+	}
 	else
+	{
 		m_pModule = PyImport_Import(pName);
+	}
+	Py_CLEAR(pName);
 	if (!m_pModule)
 	{
 		m_logger->error("Failed to import script %s", m_script.c_str());
@@ -122,7 +131,7 @@ bool PythonScript::setScript(const string& name)
 	if (pDict)
 	{
 		m_pFunc = PyDict_GetItemString(pDict, (char*)"convert");
-		Py_DECREF(pDict);
+		Py_CLEAR(pDict);
 	}
 	else
 	{
@@ -165,10 +174,10 @@ Document *doc = NULL;
 	{
 		if (PyCallable_Check(m_pFunc))
 		{
-			PyObject *dict;
-			PyObject *assetObject;
-			PyObject *pValue;
-			PyObject *pReturn;
+			PyObject *dict = NULL;
+			PyObject *assetObject = NULL;
+			PyObject *pValue = NULL;
+			PyObject *pReturn = NULL;
 		       
 			try {
 				pReturn = PyObject_CallFunction(m_pFunc, "ss", message.c_str(), topic.c_str());
@@ -185,7 +194,6 @@ Document *doc = NULL;
 			else
 			{
 				if (PyTuple_Check(pReturn)) {
-
 					if (PyArg_ParseTuple(pReturn, "O|O", &assetObject, &dict) == false) {
 
 						m_logger->error("a STRING and a DICT are expected as return values from the Python convert function");
@@ -271,7 +279,7 @@ Document *doc = NULL;
 					m_logger->error("Not adding data for '%s', unable to map type", name);
 				}
 			}
-			freeMemObj(pReturn);
+			freeMemObj(pValue);
 			freeMemObj(assetObject);
 			freeMemObj(dict);
 		}
@@ -279,7 +287,6 @@ Document *doc = NULL;
 		{
 			m_logger->error("The convert function is not callable in the supplied Python script");
 		}
-
 	}
 	else
 	{
