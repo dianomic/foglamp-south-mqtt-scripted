@@ -28,7 +28,6 @@ PythonScript::PythonScript(const string& name) : m_init(false), m_pFunc(NULL), m
 	Py_SetProgramName(programName);
 	PyMem_RawFree(programName);
 
-	m_logger->debug("PythonScript c'tor: Py_IsInitialized()=%s", Py_IsInitialized()?"true":"false");
 	if (!Py_IsInitialized())
 	{
 #ifdef PLUGIN_PYTHON_SHARED_LIBRARY
@@ -42,13 +41,10 @@ PythonScript::PythonScript(const string& name) : m_init(false), m_pFunc(NULL), m
 						  openLibrary.c_str());
 		}
 #endif
-		m_logger->debug("PythonScript c'tor: line %d", __LINE__);
 		Py_Initialize();
-		m_logger->debug("PythonScript c'tor: line %d", __LINE__);
 		//PyEval_InitThreads(); // Initialize and acquire the global interpreter lock (GIL)
 		//m_logger->info("PythonScript c'tor: line %d", __LINE__);
 		PyThreadState* save = PyEval_SaveThread(); // release GIL
-		m_logger->debug("PythonScript c'tor: line %d", __LINE__);
 		m_init = true;
 	}
 
@@ -61,7 +57,6 @@ PythonScript::PythonScript(const string& name) : m_init(false), m_pFunc(NULL), m
 	string path = getDataDir() + "/scripts";
 	PyObject* pPath = PyUnicode_DecodeFSDefault((char *)path.c_str());
 	PyList_Insert(sysPath, 0, pPath);
-	m_logger->debug("PythonScript c'tor: Set sysPath=%s", path.c_str());
 	// Remove temp object
 	Py_CLEAR(pPath);
 	PyGILState_Release(state);
@@ -72,31 +67,20 @@ PythonScript::PythonScript(const string& name) : m_init(false), m_pFunc(NULL), m
  */
 PythonScript::~PythonScript()
 {
-	m_logger->debug("~PythonScript(): start");
 	if (m_init)
 	{
 		if (Py_IsInitialized())
 		{
-			m_logger->debug("%s : %d", __FUNCTION__, __LINE__);
 			PyGILState_STATE state = PyGILState_Ensure();
-			m_logger->debug("Py_REFCNT(m_pFunc)=%d", Py_REFCNT(m_pFunc));
-			m_logger->debug("Py_REFCNT(m_pModule)=%d", Py_REFCNT(m_pModule));
 			Py_CLEAR(m_pFunc);
 			Py_CLEAR(m_pModule);
-			m_logger->debug("%s : %d", __FUNCTION__, __LINE__);
-			// while (PyGC_Collect() > 0);
-			// m_logger->info("%s : %d", __FUNCTION__, __LINE__);
 			Py_Finalize();
-			m_logger->debug("~PythonScript(): Py_Finalize done");
 		}
 		if (m_libpythonHandle)
 		{
-			m_logger->debug("%s : %d", __FUNCTION__, __LINE__);
 			dlclose(m_libpythonHandle);
-			m_logger->debug("~PythonScript(): dl_close done");
 		}
 	}
-	m_logger->debug("~PythonScript(): done");
 }
 
 /**
@@ -128,22 +112,15 @@ bool PythonScript::setScript(const string& name)
 	PyGILState_STATE state = PyGILState_Ensure();
 
 	PyObject *pName = PyUnicode_FromString((char *)m_script.c_str());
-	m_logger->debug("PythonScript::setScript: m_script=%s", m_script.c_str());
 	if (m_pModule)
 	{
-		m_logger->debug("PythonScript::setScript: before ReloadModule");
 		PyObject *new_module = PyImport_ReloadModule(m_pModule);
-		m_logger->debug("PythonScript::setScript: line %d", __LINE__);
 		Py_CLEAR(m_pModule);
-		m_logger->debug("PythonScript::setScript: line %d", __LINE__);
         	m_pModule = new_module;
-		m_logger->debug("PythonScript::setScript: after ReloadModule");
 	}
 	else
 	{
-		m_logger->debug("PythonScript::setScript: before Import");
 		m_pModule = PyImport_Import(pName);
-		m_logger->debug("PythonScript::setScript: after Import");
 	}
 	Py_CLEAR(pName);
 	if (!m_pModule)
@@ -219,7 +196,6 @@ Document *doc = NULL;
 			else
 			{
 				if (PyTuple_Check(pReturn)) {
-					m_logger->debug("%s : %d", __FUNCTION__, __LINE__);
 					if (PyArg_ParseTuple(pReturn, "O|O", &assetObject, &dict) == false) {
 
 						m_logger->error("a STRING and a DICT are expected as return values from the Python convert function");
@@ -228,10 +204,7 @@ Document *doc = NULL;
 						freeMemObj(dict);
 						return NULL;
 					}
-					else
-						m_logger->debug("%s : %d", __FUNCTION__, __LINE__);
 
-					m_logger->debug("1. Py_REFCNT(assetObject)=%d", Py_REFCNT(assetObject));
 					if (assetObject == NULL){
 
 						m_logger->error("a STRING is expected as the first value returned by the Python convert function");
@@ -256,18 +229,13 @@ Document *doc = NULL;
 							return NULL;
 						}
 					}
-					m_logger->debug("%s : %d", __FUNCTION__, __LINE__);
 
 					const char *name = PyUnicode_Check(assetObject) ?
 						PyUnicode_AsUTF8(assetObject) : PyBytes_AsString(assetObject);
-					m_logger->debug("2. Py_REFCNT(assetObject)=%d", Py_REFCNT(assetObject));
-					m_logger->debug("asset = name = %s", name);
 					asset = name;
 					pValue = dict;
-					m_logger->debug("%s : %d", __FUNCTION__, __LINE__);
 
 				} else {
-					m_logger->debug("%s : %d", __FUNCTION__, __LINE__);
 					if (!PyDict_Check(pReturn))
 					{
 						m_logger->error("Return from Python convert function is not a DICT object");
@@ -277,7 +245,6 @@ Document *doc = NULL;
 						return NULL;
 					}
 					pValue = pReturn;
-					m_logger->debug("%s : %d", __FUNCTION__, __LINE__);
 				}
 
 			}
@@ -290,7 +257,6 @@ Document *doc = NULL;
 
 			while (PyDict_Next(pValue, &pos, &key, &value))
 			{
-				m_logger->debug("%s : %d", __FUNCTION__, __LINE__);
 				const char *name = PyUnicode_Check(key) ? 
 					PyUnicode_AsUTF8(key)
 					: PyBytes_AsString(key);
@@ -315,17 +281,9 @@ Document *doc = NULL;
 					m_logger->error("Not adding data for '%s', unable to map type", name);
 				}
 			}
-			m_logger->debug("%s : %d", __FUNCTION__, __LINE__);
-			m_logger->debug("Py_REFCNT(dict)=%d", Py_REFCNT(dict));
-			m_logger->debug("Py_REFCNT(assetObject)=%d", Py_REFCNT(assetObject));
-			m_logger->debug("pValue @ %p; Py_REFCNT(pValue)=%d", pValue, Py_REFCNT(pValue));
-			m_logger->debug("pReturn @ %p; Py_REFCNT(pReturn)=%d", pReturn, Py_REFCNT(pReturn));
 			freeMemObj(pValue);
-			m_logger->debug("%s : %d", __FUNCTION__, __LINE__);
 			freeMemObj(assetObject);
-			m_logger->debug("%s : %d", __FUNCTION__, __LINE__);
 			freeMemObj(dict);
-			m_logger->debug("%s : %d", __FUNCTION__, __LINE__);
 		}
 		else
 		{

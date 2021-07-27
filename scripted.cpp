@@ -338,7 +338,6 @@ Document doc;
 			}
 
 			Logger::getLogger()->debug("%s - message :%s: topic :%s: asset :%s: ", __FUNCTION__ , message.c_str(), topic.c_str(), asset.c_str() );
-			Logger::getLogger()->debug("");
 			Reading reading(asset, points);
 			(*m_ingest)(m_data, reading);
 
