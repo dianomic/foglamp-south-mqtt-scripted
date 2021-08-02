@@ -77,6 +77,8 @@ MQTTScripted::MQTTScripted(ConfigCategory *config) : m_python(NULL), m_restart(f
  */
 MQTTScripted::~MQTTScripted()
 {
+	lock_guard<mutex> guard(m_mutex);
+
 	if (m_python)
 	{
 		delete m_python;
@@ -172,6 +174,7 @@ int rc;
 void MQTTScripted::reconfigure(const ConfigCategory& category)
 {
 	lock_guard<mutex> guard(m_mutex);
+
 	m_asset = category.getValue("asset");
 	string broker = category.getValue("broker");
 	bool resubscribe = false;
@@ -231,6 +234,8 @@ void MQTTScripted::reconfigure(const ConfigCategory& category)
 void MQTTScripted::processMessage(const string& topic,const  string& message)
 {
 Document doc;
+
+	lock_guard<mutex> guard(m_mutex);
 
 	Logger::getLogger()->debug("Processing MQTT message: %s with script %s", message.c_str(), m_script.c_str());
 	if (m_script.empty() || m_script.compare("\"\"") == 0)
