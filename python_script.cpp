@@ -74,10 +74,14 @@ PythonScript::~PythonScript()
 			Py_CLEAR(m_pFunc);
 			Py_CLEAR(m_pModule);
 			Py_Finalize();
-		}
-		if (m_libpythonHandle)
-		{
-			dlclose(m_libpythonHandle);
+
+			m_init = false;
+
+			if (m_libpythonHandle)
+			{
+				dlclose(m_libpythonHandle);
+			}
+
 		}
 	}
 }
@@ -115,7 +119,7 @@ bool PythonScript::setScript(const string& name)
 	{
 		PyObject *new_module = PyImport_ReloadModule(m_pModule);
 		Py_CLEAR(m_pModule);
-        	m_pModule = new_module;
+		m_pModule = new_module;
 	}
 	else
 	{
@@ -130,7 +134,9 @@ bool PythonScript::setScript(const string& name)
 	PyObject *pDict = PyModule_GetDict(m_pModule);
 	if (pDict)
 	{
-		m_pFunc = PyDict_GetItemString(pDict, (char*)"convert");
+		PyObject *new_func =  PyDict_GetItemString(pDict, (char*)"convert");
+		Py_CLEAR(m_pFunc);
+		m_pFunc = new_func;
 		Py_CLEAR(pDict);
 	}
 	else
@@ -139,22 +145,6 @@ bool PythonScript::setScript(const string& name)
 	}
 	PyGILState_Release(state);
 	return true;
-}
-
-void PythonScript::freeMemObj(PyObject *obj1)
-{
-	if (obj1 != NULL)
-		Py_CLEAR (obj1);
-}
-
-void PythonScript::freeMemAll(PyObject *obj1, char *str, PyObject *obj3)
-{
-	freeMemObj (obj1);
-
-	if (str != NULL)
-		Py_CLEAR (str);
-
-	freeMemObj (obj3);
 }
 
 /**
@@ -197,33 +187,27 @@ Document *doc = NULL;
 					if (PyArg_ParseTuple(pReturn, "O|O", &assetObject, &dict) == false) {
 
 						m_logger->error("a STRING and a DICT are expected as return values from the Python convert function");
-						freeMemObj(pReturn);
-						freeMemObj(assetObject);
-						freeMemObj(dict);
+						Py_CLEAR(pReturn);
 						return NULL;
 					}
 
 					if (assetObject == NULL){
 
 						m_logger->error("a STRING is expected as the first value returned by the Python convert function");
-						freeMemObj(pReturn);
-						freeMemObj(dict);
+						Py_CLEAR(pReturn);
 						return NULL;
 
 					} else if (dict == NULL){
 
 						m_logger->error("a DICT is expected as the second value returned by the Python convert function");
-						freeMemObj(pReturn);
-						freeMemObj(assetObject);
+						Py_CLEAR(pReturn);
 						return NULL;
 
 					} else {
 						if (! PyDict_Check(dict)){
 
 							m_logger->error("a DICT is expected as the second value returned by the Python convert function");
-							freeMemObj(pReturn);
-							freeMemObj(assetObject);
-							freeMemObj(dict);
+							Py_CLEAR(pReturn);
 							return NULL;
 						}
 					}
@@ -237,9 +221,7 @@ Document *doc = NULL;
 					if (!PyDict_Check(pReturn))
 					{
 						m_logger->error("Return from Python convert function is not a DICT object");
-						freeMemObj(pReturn);
-						freeMemObj(assetObject);
-						freeMemObj(dict);
+						Py_CLEAR(pReturn);
 						return NULL;
 					}
 					pValue = pReturn;
@@ -250,7 +232,8 @@ Document *doc = NULL;
 			doc = new Document();
 			auto& alloc = doc->GetAllocator();
 			doc->SetObject();
-			PyObject *key, *value;
+			PyObject *key = NULL;
+			PyObject *value = NULL;
 			Py_ssize_t pos = 0;
 
 			while (PyDict_Next(pValue, &pos, &key, &value))
@@ -279,9 +262,7 @@ Document *doc = NULL;
 					m_logger->error("Not adding data for '%s', unable to map type", name);
 				}
 			}
-			freeMemObj(pValue);
-			freeMemObj(assetObject);
-			freeMemObj(dict);
+			Py_CLEAR(pReturn);
 		}
 		else
 		{
