@@ -134,6 +134,7 @@ bool MQTTScripted::start()
  */
 void MQTTScripted::stop()
 {
+	lock_guard<mutex> guard(m_mutex);
 int rc;
 
 	if ((rc = MQTTClient_disconnect(m_client, 10000)) != MQTTCLIENT_SUCCESS)
