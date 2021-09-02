@@ -51,11 +51,41 @@ const char *default_config = QUOTE({
 	       	"order" : "2",
 	       	"mandatory": "true"
 	       	},
+	"username" : {
+       		"description" : "The username to use for the connection if any",
+		"type" : "string",
+	       	"default" : "",
+		"displayName" : "Username",
+	       	"order" : "3"
+		},
+	"password" : {
+       		"description" : "The password for the user if using authentication",
+		"type" : "string",
+	       	"default" : "",
+		"displayName" : "Password",
+	       	"order" : "4",
+		"validity" : "username != \"\""
+		},
+	"key" : {
+       		"description" : "The key to use to connect when using MQTTS",
+		"type" : "string",
+	       	"default" : "",
+		"displayName" : "MQTTS Key",
+	       	"order" : "5"
+		},
+	"root" : {
+       		"description" : "The name of the CA Certificate of the MQTT broker",
+		"type" : "string",
+	       	"default" : "",
+		"displayName" : "Root Certificate",
+	       	"order" : "6",
+		"validity" : "key != \"\""
+		},
 	"topic" : {
 		"description" : "The MQTT topic to which we subscribe to receive sensor messages",
 		"type" : "string",
 		"default" : "sensor",
-		"order": "3",
+		"order" : "7",
 		"displayName": "Topic",
 		"mandatory": "true"
 		},
@@ -63,7 +93,7 @@ const char *default_config = QUOTE({
 		"description" : "MQTT message translation Python script",
 		"type" : "script",
 		"default" : "",
-		"order": "4",
+		"order" : "8",
 		"displayName": "Script"
 		} 
 	});

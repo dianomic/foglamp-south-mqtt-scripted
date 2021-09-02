@@ -112,6 +112,23 @@ bool MQTTScripted::start()
 
 	conn_opts.keepAliveInterval = 20;
 	conn_opts.cleansession = 1;
+
+	if (m_username.length())
+	{
+		conn_opts.username = m_username.c_str();
+		conn_opts.password = m_password.c_str();
+	}
+
+	// Do we need MQTTS support
+	if (m_key.length())
+	{
+		MQTTClient_SSLOptions sslopts = MQTTClient_SSLOptions_initializer;
+
+		sslopts.trustStore = rootPath().c_str();
+		sslopts.privateKey = privateKeyPath().c_str();
+
+		conn_opts.ssl = &sslopts;
+	}
 	if ((rc = MQTTClient_connect(m_client, &conn_opts)) != MQTTCLIENT_SUCCESS)
 	{
 		Logger::getLogger()->error("Failed to connect, return code %d\n", rc);
@@ -190,6 +207,34 @@ void MQTTScripted::reconfigure(const ConfigCategory& category)
 		resubscribe = true;
 	}
 	m_topic = topic;
+
+	string key = category.getValue("key");
+	if (key.compare(m_key))
+	{
+		resubscribe = true;
+	}
+	m_key = key;
+
+	string root = category.getValue("root");
+	if (root.compare(m_root))
+	{
+		resubscribe = true;
+	}
+	m_root = root;
+
+	string username = category.getValue("username");
+	if (username.compare(m_username))
+	{
+		resubscribe = true;
+	}
+	m_username = username;
+
+	string password = category.getValue("password");
+	if (password.compare(m_password))
+	{
+		resubscribe = true;
+	}
+	m_password = password;
 
 	if (resubscribe)
 	{
@@ -350,4 +395,55 @@ Document doc;
 			delete d;
 		}
 	}
+}
+
+/**
+ * Return the path to the private ket for this connection
+ */
+string MQTTScripted::privateKeyPath()
+{
+	if (getenv("FLEDGE_DATA"))
+	{
+		m_keyPath = getenv("FLEDGE_DATA");
+		m_keyPath += "/etc/certs/";
+	}
+	else if (getenv("FLEDGE_ROOT"))
+	{
+		m_keyPath = getenv("FLEDGE_ROOT");
+		m_keyPath += "/data/etc/certs/";
+	}
+	else
+	{
+		m_keyPath = "/usr/local/fledge/data/etc/certs/"; 
+	}
+	m_keyPath += m_key;
+	m_keyPath += ".pem";
+
+	return m_keyPath;
+}
+
+/**
+ * Return the path to the root certificate
+ */
+string MQTTScripted::rootPath()
+{
+	if (getenv("FLEDGE_DATA"))
+	{
+		m_rootPath = getenv("FLEDGE_DATA");
+		m_rootPath += "/etc/certs/";
+	}
+	else if (getenv("FLEDGE_ROOT"))
+	{
+		m_rootPath = getenv("FLEDGE_ROOT");
+		m_rootPath += "/data/etc/certs/";
+	}
+	else
+	{
+		m_rootPath = "/usr/local/fledge/data/etc/certs/"; 
+	}
+	m_rootPath += "pem/";
+	m_rootPath += m_root;
+	m_rootPath += ".pem";
+
+	return m_rootPath;
 }

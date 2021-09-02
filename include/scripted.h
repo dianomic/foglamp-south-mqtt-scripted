@@ -49,6 +49,10 @@ class MQTTScripted {
 		void		reconnect();
 		std::string	getName() { return m_name; };
 	private:
+		void			(*m_ingest)(void *, Reading);
+		std::string		privateKeyPath();
+		std::string		rootPath();
+	private:
 		std::string		m_asset;
 		std::string		m_broker;
 		std::string		m_topic;
@@ -60,9 +64,14 @@ class MQTTScripted {
 		std::mutex		m_mutex;
 		MQTTClient		m_client;
 		void			*m_data;
-		void			(*m_ingest)(void *, Reading);
 		PythonScript		*m_python;
 		std::string		m_name;
 		bool			m_restart;
+		std::string		m_key;
+		std::string		m_root;
+		std::string		m_keyPath;
+		std::string		m_rootPath;
+		std::string		m_username;
+		std::string		m_password;
 };
 #endif
