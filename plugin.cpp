@@ -66,26 +66,42 @@ const char *default_config = QUOTE({
 	       	"order" : "4",
 		"validity" : "username != \"\""
 		},
-	"key" : {
-       		"description" : "The key to use to connect when using MQTTS",
+	"serverCert" : {
+       		"description" : "The name of the server certificate to be trusted. This should correspond to a PEM file stored in the FogLAMP certificate store",
 		"type" : "string",
 	       	"default" : "",
-		"displayName" : "MQTTS Key",
+		"displayName" : "Trusted Certificate",
 	       	"order" : "5"
 		},
-	"root" : {
-       		"description" : "The name of the CA Certificate of the MQTT broker",
+	"clientCert": {
+       		"description" : "The certificate that will be used by the plugin to connect to the broker. This should correspond to a PEM file stored in the FogLAMP certificate store",
 		"type" : "string",
 	       	"default" : "",
-		"displayName" : "Root Certificate",
+		"displayName" : "Client Certificate",
 	       	"order" : "6",
+		"validity" : "serverCert != \"\""
+		},
+	"key" : {
+       		"description" : "The private key used by the client to create the client certificate. This may be left blank if it is included in the PEM file of the client certificate.",
+		"type" : "string",
+	       	"default" : "",
+		"displayName" : "Private Key",
+	       	"order" : "7",
+		"validity" : "clientCert != \"\""
+		},
+	"keyPass" : {
+       		"description" : "The password used to encrypte the private key. This may be left blank if the private key is not encrypted.",
+		"type" : "password",
+	       	"default" : "",
+		"displayName" : "Key Password",
+	       	"order" : "8",
 		"validity" : "key != \"\""
 		},
 	"topic" : {
 		"description" : "The MQTT topic to which we subscribe to receive sensor messages",
 		"type" : "string",
 		"default" : "sensor",
-		"order" : "7",
+		"order" : "9",
 		"displayName": "Topic",
 		"mandatory": "true"
 		},
@@ -93,7 +109,7 @@ const char *default_config = QUOTE({
 		"description" : "MQTT message translation Python script",
 		"type" : "script",
 		"default" : "",
-		"order" : "8",
+		"order" : "10",
 		"displayName": "Script"
 		} 
 	});

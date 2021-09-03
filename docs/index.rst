@@ -73,9 +73,13 @@ When adding a south service with this plugin the same flow is used as with any o
 
   - **Password**: The password to use if username is to be used.
 
-  - **MQTTS Key**: The private key to use to for MQTTS connections. THis can be left blank if MQTTS is not required.
+  - **Trusted Certificate**: The trusted certificate of the MQTT broker. If MQTTS communication is not required then this can be left blank.
 
-  - **Root Certificate**: The root CA Certificate of the MQTT broker.
+  - **Client Certificate**: The certificate that will be used by the MQTT plugin.
+
+  - **MQTTS Key**: The private key of the MQTT plugin. If the key is included in the PEM file of the client certificate this may be left blank.
+
+  - **Key Password**: The password used to encrypted the private key. This may be left blank if the private key was not encrypt.
 
   - **Topic**: The MQTT topic to which to subscribe. The topic may include the usual MQTT wildcards; + for a single level wildcard and # for a multi-level wildcard
 

@@ -51,7 +51,8 @@ class MQTTScripted {
 	private:
 		void			(*m_ingest)(void *, Reading);
 		std::string		privateKeyPath();
-		std::string		rootPath();
+		std::string		serverCertPath();
+		std::string		clientCertPath();
 	private:
 		std::string		m_asset;
 		std::string		m_broker;
@@ -68,9 +69,12 @@ class MQTTScripted {
 		std::string		m_name;
 		bool			m_restart;
 		std::string		m_key;
-		std::string		m_root;
+		std::string		m_serverCert;
+		std::string		m_clientCert;
 		std::string		m_keyPath;
-		std::string		m_rootPath;
+		std::string		m_keyPass;
+		std::string		m_serverCertPath;
+		std::string		m_clientCertPath;
 		std::string		m_username;
 		std::string		m_password;
 };

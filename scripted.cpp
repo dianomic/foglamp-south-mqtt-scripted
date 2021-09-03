@@ -120,12 +120,16 @@ bool MQTTScripted::start()
 	}
 
 	// Do we need MQTTS support
-	if (m_key.length())
+	if (m_serverCert.length())
 	{
 		MQTTClient_SSLOptions sslopts = MQTTClient_SSLOptions_initializer;
 
-		sslopts.trustStore = rootPath().c_str();
-		sslopts.privateKey = privateKeyPath().c_str();
+		sslopts.trustStore = serverCertPath().c_str();
+		sslopts.keyStore = clientCertPath().c_str();
+		if (m_key.length())
+			sslopts.privateKey = privateKeyPath().c_str();
+		if (m_keyPass.length())
+			sslopts.privateKeyPassword = m_keyPass.c_str();
 
 		conn_opts.ssl = &sslopts;
 	}
@@ -215,12 +219,26 @@ void MQTTScripted::reconfigure(const ConfigCategory& category)
 	}
 	m_key = key;
 
-	string root = category.getValue("root");
-	if (root.compare(m_root))
+	string clientCert = category.getValue("clientCert");
+	if (clientCert.compare(m_clientCert))
 	{
 		resubscribe = true;
 	}
-	m_root = root;
+	m_clientCert = clientCert;
+
+	string keyPass = category.getValue("keyPass");
+	if (keyPass.compare(m_keyPass))
+	{
+		resubscribe = true;
+	}
+	m_keyPass = keyPass;
+
+	string serverCert = category.getValue("serverCert");
+	if (serverCert.compare(m_serverCert))
+	{
+		resubscribe = true;
+	}
+	m_serverCert = serverCert;
 
 	string username = category.getValue("username");
 	if (username.compare(m_username))
@@ -402,19 +420,19 @@ Document doc;
  */
 string MQTTScripted::privateKeyPath()
 {
-	if (getenv("FLEDGE_DATA"))
+	if (getenv("FOGLAMP_DATA"))
 	{
-		m_keyPath = getenv("FLEDGE_DATA");
+		m_keyPath = getenv("FOGLAMP_DATA");
 		m_keyPath += "/etc/certs/";
 	}
-	else if (getenv("FLEDGE_ROOT"))
+	else if (getenv("FOGLAMP_ROOT"))
 	{
-		m_keyPath = getenv("FLEDGE_ROOT");
+		m_keyPath = getenv("FOGLAMP_ROOT");
 		m_keyPath += "/data/etc/certs/";
 	}
 	else
 	{
-		m_keyPath = "/usr/local/fledge/data/etc/certs/"; 
+		m_keyPath = "/usr/local/foglamp/data/etc/certs/"; 
 	}
 	m_keyPath += m_key;
 	m_keyPath += ".pem";
@@ -423,27 +441,53 @@ string MQTTScripted::privateKeyPath()
 }
 
 /**
- * Return the path to the root certificate
+ * Return the path to the server certificate
  */
-string MQTTScripted::rootPath()
+string MQTTScripted::clientCertPath()
 {
-	if (getenv("FLEDGE_DATA"))
+	if (getenv("FOGLAMP_DATA"))
 	{
-		m_rootPath = getenv("FLEDGE_DATA");
-		m_rootPath += "/etc/certs/";
+		m_clientCertPath = getenv("FOGLAMP_DATA");
+		m_clientCertPath += "/etc/certs/";
 	}
-	else if (getenv("FLEDGE_ROOT"))
+	else if (getenv("FOGLAMP_ROOT"))
 	{
-		m_rootPath = getenv("FLEDGE_ROOT");
-		m_rootPath += "/data/etc/certs/";
+		m_clientCertPath = getenv("FOGLAMP_ROOT");
+		m_clientCertPath += "/data/etc/certs/";
 	}
 	else
 	{
-		m_rootPath = "/usr/local/fledge/data/etc/certs/"; 
+		m_clientCertPath = "/usr/local/foglamp/data/etc/certs/"; 
 	}
-	m_rootPath += "pem/";
-	m_rootPath += m_root;
-	m_rootPath += ".pem";
+	m_clientCertPath += "pem/";
+	m_clientCertPath += m_clientCert;
+	m_clientCertPath += ".pem";
 
-	return m_rootPath;
+	return m_clientCertPath;
+}
+
+/**
+ * Return the path to the server certificate
+ */
+string MQTTScripted::serverCertPath()
+{
+	if (getenv("FOGLAMP_DATA"))
+	{
+		m_serverCertPath = getenv("FOGLAMP_DATA");
+		m_serverCertPath += "/etc/certs/";
+	}
+	else if (getenv("FOGLAMP_ROOT"))
+	{
+		m_serverCertPath = getenv("FOGLAMP_ROOT");
+		m_serverCertPath += "/data/etc/certs/";
+	}
+	else
+	{
+		m_serverCertPath = "/usr/local/foglamp/data/etc/certs/"; 
+	}
+	m_serverCertPath += "pem/";
+	m_serverCertPath += m_serverCert;
+	m_serverCertPath += ".pem";
+
+	return m_serverCertPath;
 }
