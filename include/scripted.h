@@ -48,11 +48,15 @@ class MQTTScripted {
 		void		processMessage(const std::string& topic, const std::string& payload);
 		void		reconnect();
 		std::string	getName() { return m_name; };
+		void		sslError(const char *str, int len) {
+					m_logger->error("SSL Error: %s", str);
+				};
 	private:
 		void			(*m_ingest)(void *, Reading);
 		std::string		privateKeyPath();
 		std::string		serverCertPath();
 		std::string		clientCertPath();
+		std::string		pemPath();
 	private:
 		std::string		m_asset;
 		std::string		m_broker;
@@ -77,5 +81,8 @@ class MQTTScripted {
 		std::string		m_clientCertPath;
 		std::string		m_username;
 		std::string		m_password;
+		enum { mFailed, mCreated, mConnected }
+					m_state;
+		std::string		m_pemPath;
 };
 #endif
