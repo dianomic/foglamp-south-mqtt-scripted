@@ -14,6 +14,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <time.h>
 
 #define TIMEOUT     10000L
 
@@ -82,6 +83,20 @@ MQTTScripted::MQTTScripted(ConfigCategory *config) : m_python(NULL), m_restart(f
 	m_password = config->getValue("password");
 	string policy = config->getValue("policy");
 	processPolicy(policy);
+	m_timestamp = config->getValue("timestamp");
+	m_timeFormat = config->getValue("format");
+	string timezone = config->getValue("timezone");
+	m_offset = strtol(timezone.c_str(), NULL, 10);
+	m_offset *= 60 * 60;
+	long num;
+	auto res = timezone.find_first_of(':');
+	if (res |= string::npos)
+	{
+		string mins = timezone.substr(res + 1);
+		num = strtol(mins.c_str(), NULL, 10);
+		num *= 60;
+		m_offset += 60;
+	}
 	m_script = config->getItemAttribute("script", ConfigCategory::FILE_ATTR);
 	m_content = config->getValue("script");
 	m_clientID = config->getName();
@@ -397,6 +412,22 @@ void MQTTScripted::reconfigure(const ConfigCategory& category)
 	string policy = category.getValue("policy");
 	processPolicy(policy);
 
+	m_timestamp = category.getValue("timestamp");
+	m_timeFormat = category.getValue("format");
+
+	string timezone = category.getValue("timezone");
+	m_offset = strtol(timezone.c_str(), NULL, 10);
+	m_offset *= 60 * 60;
+	long num;
+	auto res = timezone.find_first_of(':');
+	if (res |= string::npos)
+	{
+		string mins = timezone.substr(res + 1);
+		num = strtol(mins.c_str(), NULL, 10);
+		num *= 60;
+		m_offset += 60;
+	}
+
 	if (resubscribe)
 	{
 		Logger::getLogger()->info("Resubscribing to MQTT broker following reconfiguration");
@@ -602,24 +633,39 @@ void MQTTScripted::processDocument(Document& doc, const string& asset)
 	{
 		Logger::getLogger()->debug("Policy is to take data from the first level only");
 		vector<Datapoint *> points;
-		getValues(doc.GetObject(), points, false);
+		string ts;
+		getValues(doc.GetObject(), points, false, ts);
 		Reading reading(asset, points);
+		if (!ts.empty())
+			reading.setUserTimestamp(ts);
 		(*m_ingest)(m_data, reading);
 	}
 	else if (m_policy == mPolicyCollapse)
 	{
 		Logger::getLogger()->debug("Policy is to collapse data into a single reading");
 		vector<Datapoint *> points;
-		getValues(doc.GetObject(), points, true);;
+		string ts;
+		getValues(doc.GetObject(), points, true, ts);
 		Reading reading(asset, points);
+		if (!ts.empty())
+			reading.setUserTimestamp(ts);
 		(*m_ingest)(m_data, reading);
 	}
 	else if (m_policy == mPolicyMultiple)
 	{
 		Logger::getLogger()->debug("Policy is to create multiple readings");
+		string user_ts;
 		vector<Datapoint *> points;
 		for (auto& m : doc.GetObject())
 		{
+			if (!strcmp(m.name.GetString(), m_timestamp.c_str()))
+			{
+				if (m.value.IsString())
+				{
+					user_ts = m.value.GetString();
+					convertTimestamp(user_ts);
+				}
+			}
 			if (m.value.IsInt64())
 			{
 				long v = m.value.GetInt64();
@@ -640,15 +686,20 @@ void MQTTScripted::processDocument(Document& doc, const string& asset)
 			}
 			else if (m.value.IsObject()) 
 			{
+				string ts;
 				vector<Datapoint *> children;
-				getValues(m.value, children, true);
+				getValues(m.value, children, true, ts);
 				Reading reading(m.name.GetString(), children);
+				if (!ts.empty())
+					reading.setUserTimestamp(ts);
 				(*m_ingest)(m_data, reading);
 			}
 		}
 		if (points.size() > 0)
 		{
 			Reading reading(asset, points);
+			if (!user_ts.empty())
+				reading.setUserTimestamp(user_ts);
 			(*m_ingest)(m_data, reading);
 		}
 	}
@@ -663,11 +714,19 @@ void MQTTScripted::processDocument(Document& doc, const string& asset)
  * @param points	The datapoint array
  * @param recurse	Recusrse to nested objects
  */
-void MQTTScripted::getValues(const Value& object, vector<Datapoint *>& points, bool recurse)
+void MQTTScripted::getValues(const Value& object, vector<Datapoint *>& points, bool recurse, string& user_ts)
 {
 	// Iterate the document
 	for (auto& m : object.GetObject())
 	{
+		if (!strcmp(m.name.GetString(), m_timestamp.c_str()))
+		{
+			if (m.value.IsString())
+			{
+				user_ts = m.value.GetString();
+				convertTimestamp(user_ts);
+			}
+		}
 		if (m.value.IsInt64())
 		{
 			long v = m.value.GetInt64();
@@ -691,14 +750,37 @@ void MQTTScripted::getValues(const Value& object, vector<Datapoint *>& points, b
 			if (m_nest)
 			{
 				vector<Datapoint *> *children = new vector<Datapoint *>;
-				getValues(m.value, *children, true);
+				string ts;
+				getValues(m.value, *children, true, ts);
 				DatapointValue	dpv(children, true);
 				points.push_back(new Datapoint( m.name.GetString(), dpv));
 			}
 			else
 			{
-				getValues(m.value, points, true);
+				string ts;
+				getValues(m.value, points, true, ts);
 			}
 		}
 	}
+}
+
+
+
+/**
+ * Convert some common timestamp formats to formats required by FogLAMP
+ *
+ * @param ts	Timestamp to convert
+ */
+void MQTTScripted::convertTimestamp(string& ts)
+{
+struct tm tm;
+char	buf[200];
+
+	strptime(ts.c_str(), m_timeFormat.c_str(), &tm);
+	// Now adjust for the timezone
+	time_t tim = mktime(&tm);
+	tim += m_offset;
+	gmtime_r(&tim, &tm);
+	strftime(buf, sizeof(buf), DEFAULT_DATE_TIME_FORMAT, &tm);
+	ts = buf;
 }

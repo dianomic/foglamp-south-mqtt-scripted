@@ -116,11 +116,36 @@ const char *default_config = QUOTE({
 		"displayName": "Object Policy",
 		"mandatory": "true"
 		},
+	"timestamp" : {
+		"description" : "The name of a property that should be used as a timestamp. If left blank then the payload is assumed not to have a tiemstamp and readings are timestamped with the current date and time",
+		"type" : "string",
+		"default" : "",
+		"order" : "11",
+		"displayName": "Timestamp"
+		},
+	"format" : {
+       		"description" : "The format of timestamps to pass if using the time based data selection method and also the format of timestamps in the payload",
+		"type" : "string",
+	       	"default" : "",
+		"displayName" : "Time Format",
+	       	"order" : "13",
+	       	"mandatory": "false",
+		"validity": "timestamp != \"\""
+		},
+	"timezone" : {
+       		"description" : "The default timezone to use if none is specific. Timezones should be expressed as time offsets",
+		"type" : "string",
+	       	"default" : "+00:00",
+		"displayName" : "Timezone",
+	       	"order" : "12",
+	       	"mandatory": "false",
+		"validity": "timestamp != \"\""
+		},
 	"script" : {
 		"description" : "MQTT message translation Python script",
 		"type" : "script",
 		"default" : "",
-		"order" : "11",
+		"order" : "14",
 		"displayName": "Script"
 		} 
 	});
