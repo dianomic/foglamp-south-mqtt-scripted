@@ -52,14 +52,14 @@ const char *default_config = QUOTE({
 	       	"mandatory": "true"
 	       	},
 	"username" : {
-       		"description" : "The username to use for the connection if any",
+		"description" : "The username to use for the connection if any",
 		"type" : "string",
 	       	"default" : "",
 		"displayName" : "Username",
 	       	"order" : "3"
 		},
 	"password" : {
-       		"description" : "The password for the user if using authentication",
+		"description" : "The password for the user if using authentication",
 		"type" : "string",
 	       	"default" : "",
 		"displayName" : "Password",
@@ -67,14 +67,14 @@ const char *default_config = QUOTE({
 		"validity" : "username != \"\""
 		},
 	"serverCert" : {
-       		"description" : "The name of the server certificate to be trusted. This should correspond to a PEM file stored in the FogLAMP certificate store",
+		"description" : "The name of the server certificate to be trusted. This should correspond to a PEM file stored in the FogLAMP certificate store",
 		"type" : "string",
 	       	"default" : "",
 		"displayName" : "Trusted Certificate",
 	       	"order" : "5"
 		},
 	"clientCert": {
-       		"description" : "The certificate that will be used by the plugin to connect to the broker. This should correspond to a PEM file stored in the FogLAMP certificate store",
+		"description" : "The certificate that will be used by the plugin to connect to the broker. This should correspond to a PEM file stored in the FogLAMP certificate store",
 		"type" : "string",
 	       	"default" : "",
 		"displayName" : "Client Certificate",
@@ -82,7 +82,7 @@ const char *default_config = QUOTE({
 		"validity" : "serverCert != \"\""
 		},
 	"key" : {
-       		"description" : "The private key used by the client to create the client certificate. This may be left blank if it is included in the PEM file of the client certificate.",
+		"description" : "The private key used by the client to create the client certificate. This may be left blank if it is included in the PEM file of the client certificate.",
 		"type" : "string",
 	       	"default" : "",
 		"displayName" : "Private Key",
@@ -90,7 +90,7 @@ const char *default_config = QUOTE({
 		"validity" : "clientCert != \"\""
 		},
 	"keyPass" : {
-       		"description" : "The password used to encrypte the private key. This may be left blank if the private key is not encrypted.",
+		"description" : "The password used to encrypte the private key. This may be left blank if the private key is not encrypted.",
 		"type" : "password",
 	       	"default" : "",
 		"displayName" : "Key Password",
@@ -105,11 +105,22 @@ const char *default_config = QUOTE({
 		"displayName": "Topic",
 		"mandatory": "true"
 		},
+	"policy" : {
+		"description" : "The policy to choose when dealign with nested objects in the response payload or the response form the script.",
+		"type" : "enumeration",
+		"options" : [ "Single reading from root level", "Single reading & collapse",
+				"Single reading & nest", "Multiple readings & collapse",
+				"Multiple readings & nest" ],
+		"default" : "Single reading from root level",
+		"order" : "10",
+		"displayName": "Object Policy",
+		"mandatory": "true"
+		},
 	"script" : {
 		"description" : "MQTT message translation Python script",
 		"type" : "script",
 		"default" : "",
-		"order" : "10",
+		"order" : "11",
 		"displayName": "Script"
 		} 
 	});

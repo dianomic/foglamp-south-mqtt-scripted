@@ -80,6 +80,8 @@ MQTTScripted::MQTTScripted(ConfigCategory *config) : m_python(NULL), m_restart(f
 	m_serverCert = config->getValue("serverCert");
 	m_username = config->getValue("username");
 	m_password = config->getValue("password");
+	string policy = config->getValue("policy");
+	processPolicy(policy);
 	m_script = config->getItemAttribute("script", ConfigCategory::FILE_ATTR);
 	m_content = config->getValue("script");
 	m_clientID = config->getName();
@@ -101,6 +103,44 @@ MQTTScripted::~MQTTScripted()
 	if (m_python)
 	{
 		delete m_python;
+	}
+}
+
+/**
+ * Process the policy string
+ *
+ * @param policy	The required policy
+ */
+void MQTTScripted::processPolicy(const string& policy)
+{
+	if (policy.compare("Single reading from root level") == 0)
+	{
+		m_policy = mPolicyFirstLevel;
+		m_nest = false;
+	}
+	else if (policy.compare("Single reading & collapse") == 0)
+	{
+		m_policy = mPolicyCollapse;
+		m_nest = false;
+	}
+	else if (policy.compare("Single reading & nest") == 0)
+	{
+		m_policy = mPolicyCollapse;
+		m_nest = true;
+	}
+	else if (policy.compare("Multiple readings & collapse") == 0)
+	{
+		m_policy = mPolicyMultiple;
+		m_nest = false;
+	}
+	else if (policy.compare("Multiple readings & nest") == 0)
+	{
+		m_policy = mPolicyMultiple;
+		m_nest = true;
+	}
+	else
+	{
+		Logger::getLogger()->error("Unsupported value for policy configuration '%s'", policy.c_str());
 	}
 }
 
@@ -354,6 +394,9 @@ void MQTTScripted::reconfigure(const ConfigCategory& category)
 	}
 	m_password = password;
 
+	string policy = category.getValue("policy");
+	processPolicy(policy);
+
 	if (resubscribe)
 	{
 		Logger::getLogger()->info("Resubscribing to MQTT broker following reconfiguration");
@@ -410,31 +453,7 @@ Document doc;
 		if (doc.HasParseError() == false && doc.IsObject())
 		{
 			Logger::getLogger()->debug("Message is JSON");
-			vector<Datapoint *> points;
-			// Iterate the document
-			for (auto& m : doc.GetObject())
-			{
-				if (m.value.IsInt64())
-				{
-					long v = m.value.GetInt64();
-					DatapointValue dpv(v);
-					points.push_back(new Datapoint( m.name.GetString(), dpv));
-				}
-				else if (m.value.IsDouble())
-				{
-					double d = m.value.GetDouble();
-					DatapointValue dpv(d);
-					points.push_back(new Datapoint( m.name.GetString(), dpv));
-				}
-				else if (m.value.IsString())
-				{
-					const char *s = m.value.GetString();
-					DatapointValue dpv(s);
-					points.push_back(new Datapoint( m.name.GetString(), dpv));
-				}
-			}
-			Reading reading(m_asset, points);
-			(*m_ingest)(m_data, reading);
+			processDocument(doc, m_asset);
 		}
 		else
 		{
@@ -479,37 +498,13 @@ Document doc;
 
 		if (d)
 		{
-			vector<Datapoint *> points;
-			// Iterate the document
-			for (auto& m : d->GetObject())
-			{
-				if (m.value.IsInt64())
-				{
-					long v = m.value.GetInt64();
-					DatapointValue dpv(v);
-					points.push_back(new Datapoint( m.name.GetString(), dpv));
-				}
-				else if (m.value.IsDouble())
-				{
-					double d = m.value.GetDouble();
-					DatapointValue dpv(d);
-					points.push_back(new Datapoint( m.name.GetString(), dpv));
-				}
-				else if (m.value.IsString())
-				{
-					const char *s = m.value.GetString();
-					DatapointValue dpv(s);
-					points.push_back(new Datapoint( m.name.GetString(), dpv));
-				}
-			}
 			if (asset.empty()) {
 
 				asset = m_asset;
 			}
+			processDocument(*d, asset);
 
 			Logger::getLogger()->debug("%s - message :%s: topic :%s: asset :%s: ", __FUNCTION__ , message.c_str(), topic.c_str(), asset.c_str() );
-			Reading reading(asset, points);
-			(*m_ingest)(m_data, reading);
 
 			delete d;
 		}
@@ -593,4 +588,117 @@ string MQTTScripted::serverCertPath()
 	}
 
 	return m_serverCertPath;
+}
+
+/**
+ * Process the JSON document following the rules regarding collapsing and creating
+ * multiple readings.
+ *
+ * @param doc	The JSON document to process into readings
+ */
+void MQTTScripted::processDocument(Document& doc, const string& asset)
+{
+	if (m_policy == mPolicyFirstLevel)
+	{
+		Logger::getLogger()->debug("Policy is to take data from the first level only");
+		vector<Datapoint *> points;
+		getValues(doc.GetObject(), points, false);
+		Reading reading(asset, points);
+		(*m_ingest)(m_data, reading);
+	}
+	else if (m_policy == mPolicyCollapse)
+	{
+		Logger::getLogger()->debug("Policy is to collapse data into a single reading");
+		vector<Datapoint *> points;
+		getValues(doc.GetObject(), points, true);;
+		Reading reading(asset, points);
+		(*m_ingest)(m_data, reading);
+	}
+	else if (m_policy == mPolicyMultiple)
+	{
+		Logger::getLogger()->debug("Policy is to create multiple readings");
+		vector<Datapoint *> points;
+		for (auto& m : doc.GetObject())
+		{
+			if (m.value.IsInt64())
+			{
+				long v = m.value.GetInt64();
+				DatapointValue dpv(v);
+				points.push_back(new Datapoint( m.name.GetString(), dpv));
+			}
+			else if (m.value.IsDouble())
+			{
+				double d = m.value.GetDouble();
+				DatapointValue dpv(d);
+				points.push_back(new Datapoint( m.name.GetString(), dpv));
+			}
+			else if (m.value.IsString())
+			{
+				const char *s = m.value.GetString();
+				DatapointValue dpv(s);
+				points.push_back(new Datapoint( m.name.GetString(), dpv));
+			}
+			else if (m.value.IsObject()) 
+			{
+				vector<Datapoint *> children;
+				getValues(m.value, children, true);
+				Reading reading(m.name.GetString(), children);
+				(*m_ingest)(m_data, reading);
+			}
+		}
+		if (points.size() > 0)
+		{
+			Reading reading(asset, points);
+			(*m_ingest)(m_data, reading);
+		}
+	}
+}
+
+/**
+ * Get the values from the current level of the JSON document.
+ * If the recuse flag is set we will recurse into child objects
+ * and extract the data from those objects also.
+ *
+ * @param object	The object to iterate over
+ * @param points	The datapoint array
+ * @param recurse	Recusrse to nested objects
+ */
+void MQTTScripted::getValues(const Value& object, vector<Datapoint *>& points, bool recurse)
+{
+	// Iterate the document
+	for (auto& m : object.GetObject())
+	{
+		if (m.value.IsInt64())
+		{
+			long v = m.value.GetInt64();
+			DatapointValue dpv(v);
+			points.push_back(new Datapoint( m.name.GetString(), dpv));
+		}
+		else if (m.value.IsDouble())
+		{
+			double d = m.value.GetDouble();
+			DatapointValue dpv(d);
+			points.push_back(new Datapoint( m.name.GetString(), dpv));
+		}
+		else if (m.value.IsString())
+		{
+			const char *s = m.value.GetString();
+			DatapointValue dpv(s);
+			points.push_back(new Datapoint( m.name.GetString(), dpv));
+		}
+		else if (m.value.IsObject() && recurse)
+		{
+			if (m_nest)
+			{
+				vector<Datapoint *> *children = new vector<Datapoint *>;
+				getValues(m.value, *children, true);
+				DatapointValue	dpv(children, true);
+				points.push_back(new Datapoint( m.name.GetString(), dpv));
+			}
+			else
+			{
+				getValues(m.value, points, true);
+			}
+		}
+	}
 }

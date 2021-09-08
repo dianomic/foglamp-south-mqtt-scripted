@@ -1,5 +1,6 @@
 .. Images
 .. |mqtt_01| image:: images/mqtt_01.jpg
+.. |mqtt_02| image:: images/mqtt_02.jpg
 
 MQTT South with Payload Scripting
 =================================
@@ -83,4 +84,26 @@ When adding a south service with this plugin the same flow is used as with any o
 
   - **Topic**: The MQTT topic to which to subscribe. The topic may include the usual MQTT wildcards; + for a single level wildcard and # for a multi-level wildcard
 
+  - **Object Policy**: Controls how the plugin deals with nested objects within the JSON payloads it receives or the return from the script that is executed. See below for a description of the various object policy values.
+
   - **Script**: The Python script to execute for message processing. Initially a file must be uploaded, however once uploaded the user may edit the script in the box provided. A script is optional.
+
+
+Object Policy
+=============
+
+The object policy is used by the plugin to determine how it deals with nested objects within the JSON that is in the MQTT payload or the JSON that is returned from the script that is executed, if present.
+
++-----------+
+| |mqtt_02| |
++-----------+
+
+  - **Single reading fronm root level**: This is the simple behaviour of the plugin, it will only take numeric and string values that are in the root of the JSON document and ignore any objects contaioned in the root.
+
+  - **Single reading & collapse**: The plugin will create a single reading form the payload that will contian the string and numeric data in the root level. The plugin will also recusively traverse any child objects and add the string and numeric data from those to the reading as data points of the reading itself.
+
+  - **Single reading & nest**: As above, the plugin will create a single reading form the payload that will contian the string and numeric data in the root level. The plugin will also recusively traverse any child objects and add the string and numeric data from those objects and add them as nested data points.
+
+  - **Multiple readings & collapse**: The plugin will create one reading that contians any string and numeric data in the root of the JSON. It will then create one reading for each object in the root level. Each of these readings will contain the string and numeric data from those child objects along with the data found in the children of those objects. Any child data will be collapse into the base level of the readings.
+
+  - **Multiple readings & nest**: As above, but any data in the children of the readings found below the first level, which defines the reading names, will be created as nested data points rather than collapsed.

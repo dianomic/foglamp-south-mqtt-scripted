@@ -57,6 +57,10 @@ class MQTTScripted {
 		std::string		serverCertPath();
 		std::string		clientCertPath();
 		std::string		pemPath();
+		void			processDocument(rapidjson::Document& doc, const std::string &asset);
+		void			getValues(const rapidjson::Value& object, std::vector<Datapoint *>& points, bool recurse);
+		void			processPolicy(const std::string& policy);
+
 	private:
 		std::string		m_asset;
 		std::string		m_broker;
@@ -84,5 +88,8 @@ class MQTTScripted {
 		enum { mFailed, mCreated, mConnected }
 					m_state;
 		std::string		m_pemPath;
+		enum { mPolicyFirstLevel, mPolicyCollapse, mPolicyMultiple }
+					m_policy;
+		bool			m_nest;
 };
 #endif
