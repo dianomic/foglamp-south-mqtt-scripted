@@ -98,7 +98,7 @@ The object policy is used by the plugin to determine how it deals with nested ob
 | |mqtt_02| |
 +-----------+
 
-  - **Single reading fronm root level**: This is the simple behaviour of the plugin, it will only take numeric and string values that are in the root of the JSON document and ignore any objects contaioned in the root.
+  - **Single reading from root level**: This is the simple behaviour of the plugin, it will only take numeric and string values that are in the root of the JSON document and ignore any objects contaioned in the root.
 
   - **Single reading & collapse**: The plugin will create a single reading form the payload that will contian the string and numeric data in the root level. The plugin will also recusively traverse any child objects and add the string and numeric data from those to the reading as data points of the reading itself.
 
@@ -107,3 +107,34 @@ The object policy is used by the plugin to determine how it deals with nested ob
   - **Multiple readings & collapse**: The plugin will create one reading that contians any string and numeric data in the root of the JSON. It will then create one reading for each object in the root level. Each of these readings will contain the string and numeric data from those child objects along with the data found in the children of those objects. Any child data will be collapse into the base level of the readings.
 
   - **Multiple readings & nest**: As above, but any data in the children of the readings found below the first level, which defines the reading names, will be created as nested data points rather than collapsed.
+
+As an example of how the policy works assume we have an MQTT payload with a message as below
+
+.. code-block:: JSON
+
+   {
+        "name"  : "pump47",
+        "motor" : {
+                    "current" : 0.75,
+                    "speed"   : 1496
+                    },
+        "flow"  : 1.72,
+        "temperatures" : {
+                    "bearing" : 21.5,
+                    "impeller" : 16.2,
+                    "motor" : {
+                          "casing" : 24.6,
+                          "gearbox" : 28.2
+                          }
+                         }
+   }
+
+If the policy is set to *Single reading from root level* then a reading would be created, with the asset name given in the configuration of the plugin, that countained two data points *name* and *flow*.
+
+If the policy is set to *Single reading & collapse* then the reading created would now have 8 data points; *name*, *current*, *speed*, *flow*, *bearing*, *impeller*, *casing* and *gearbox*. These would all be in a reading with the asset name defined in the configuration and in a flat structure.
+
+If the policy is set to *Single reading & nest* there would still be a single reading, with the asset naem set in the configuration, which would have data points for *name*, *motor*, *flow* and *temperature*. The *motor* data point would have two child data points called *current* and *speed*, the *temperature* data point would have three child data points called *bearing*, *impeller* and *motor*. This *motor* data point would itself have two children call *casing* and *gearbox*.
+
+If the policy is set to *Multiple readings & collapse* there would be three readings created from this payload; one that is names as per the asset name in the configuration, a *motor* reading and a *temperature* reading. The first of these readings would have data points called *name* and *flow*, the *motor* reading would have data points *current* and *speed*. The *temperatures* reading would have data points *bearing*, *impeller*, *casing* and *gearbox*.
+
+If the policy is set to *Multiple readings & nest* there would be three readings created from this payload; one that is names as per the asset name in the configuration, a *motor* reading and a *temperature* reading. The first of these readings would have data points called *name* and *flow*, the *motor* reading would have data points *current* and *speed*. The *temperatures* reading would have data points *bearing*, *impeller* and *motor*, the *motor* data point would have two child data points *casing* and *gearbox*.
