@@ -48,6 +48,15 @@ class MQTTScripted {
 		void		processMessage(const std::string& topic, const std::string& payload);
 		void		reconnect();
 		std::string	getName() { return m_name; };
+		void		sslError(const char *str, int len) {
+					m_logger->error("SSL Error: %s", str);
+				};
+	private:
+		void			(*m_ingest)(void *, Reading);
+		std::string		privateKeyPath();
+		std::string		serverCertPath();
+		std::string		clientCertPath();
+		std::string		pemPath();
 	private:
 		std::string		m_asset;
 		std::string		m_broker;
@@ -60,9 +69,20 @@ class MQTTScripted {
 		std::mutex		m_mutex;
 		MQTTClient		m_client;
 		void			*m_data;
-		void			(*m_ingest)(void *, Reading);
 		PythonScript		*m_python;
 		std::string		m_name;
 		bool			m_restart;
+		std::string		m_key;
+		std::string		m_serverCert;
+		std::string		m_clientCert;
+		std::string		m_keyPath;
+		std::string		m_keyPass;
+		std::string		m_serverCertPath;
+		std::string		m_clientCertPath;
+		std::string		m_username;
+		std::string		m_password;
+		enum { mFailed, mCreated, mConnected }
+					m_state;
+		std::string		m_pemPath;
 };
 #endif

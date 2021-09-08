@@ -51,11 +51,57 @@ const char *default_config = QUOTE({
 	       	"order" : "2",
 	       	"mandatory": "true"
 	       	},
+	"username" : {
+       		"description" : "The username to use for the connection if any",
+		"type" : "string",
+	       	"default" : "",
+		"displayName" : "Username",
+	       	"order" : "3"
+		},
+	"password" : {
+       		"description" : "The password for the user if using authentication",
+		"type" : "string",
+	       	"default" : "",
+		"displayName" : "Password",
+	       	"order" : "4",
+		"validity" : "username != \"\""
+		},
+	"serverCert" : {
+       		"description" : "The name of the server certificate to be trusted. This should correspond to a PEM file stored in the FogLAMP certificate store",
+		"type" : "string",
+	       	"default" : "",
+		"displayName" : "Trusted Certificate",
+	       	"order" : "5"
+		},
+	"clientCert": {
+       		"description" : "The certificate that will be used by the plugin to connect to the broker. This should correspond to a PEM file stored in the FogLAMP certificate store",
+		"type" : "string",
+	       	"default" : "",
+		"displayName" : "Client Certificate",
+	       	"order" : "6",
+		"validity" : "serverCert != \"\""
+		},
+	"key" : {
+       		"description" : "The private key used by the client to create the client certificate. This may be left blank if it is included in the PEM file of the client certificate.",
+		"type" : "string",
+	       	"default" : "",
+		"displayName" : "Private Key",
+	       	"order" : "7",
+		"validity" : "clientCert != \"\""
+		},
+	"keyPass" : {
+       		"description" : "The password used to encrypte the private key. This may be left blank if the private key is not encrypted.",
+		"type" : "password",
+	       	"default" : "",
+		"displayName" : "Key Password",
+	       	"order" : "8",
+		"validity" : "key != \"\""
+		},
 	"topic" : {
 		"description" : "The MQTT topic to which we subscribe to receive sensor messages",
 		"type" : "string",
 		"default" : "sensor",
-		"order": "3",
+		"order" : "9",
 		"displayName": "Topic",
 		"mandatory": "true"
 		},
@@ -63,7 +109,7 @@ const char *default_config = QUOTE({
 		"description" : "MQTT message translation Python script",
 		"type" : "script",
 		"default" : "",
-		"order": "4",
+		"order" : "10",
 		"displayName": "Script"
 		} 
 	});

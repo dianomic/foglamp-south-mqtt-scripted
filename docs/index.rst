@@ -69,6 +69,18 @@ When adding a south service with this plugin the same flow is used as with any o
 
   - **MQTT Broker**: The IP address/hostname of the MQTT broker to use. Note FogLAMP requires an external MQTT broker is run currently and does not provide an internal broker in the current release.
 
+  - **Username**: The username to be used if required for authentication. This should be left blank if authentication is not required.
+
+  - **Password**: The password to use if username is to be used.
+
+  - **Trusted Certificate**: The trusted certificate of the MQTT broker. If MQTTS communication is not required then this can be left blank.
+
+  - **Client Certificate**: The certificate that will be used by the MQTT plugin.
+
+  - **MQTTS Key**: The private key of the MQTT plugin. If the key is included in the PEM file of the client certificate this may be left blank.
+
+  - **Key Password**: The password used to encrypted the private key. This may be left blank if the private key was not encrypt.
+
   - **Topic**: The MQTT topic to which to subscribe. The topic may include the usual MQTT wildcards; + for a single level wildcard and # for a multi-level wildcard
 
   - **Script**: The Python script to execute for message processing. Initially a file must be uploaded, however once uploaded the user may edit the script in the box provided. A script is optional.

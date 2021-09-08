@@ -97,9 +97,9 @@ target_link_libraries(${PROJECT_NAME} ${NEEDED_FOGLAMP_LIBS})
 
 # Add additional libraries
 if(${CMAKE_VERSION} VERSION_LESS "3.12.0") 
-    target_link_libraries(${PROJECT_NAME} -lssl -lcrypto -lpaho-mqtt3c ${PYTHON_LIBRARIES})
+    target_link_libraries(${PROJECT_NAME} -lssl -lcrypto -lpaho-mqtt3cs ${PYTHON_LIBRARIES})
 else()
-    target_link_libraries(${PROJECT_NAME} -lssl -lcrypto -lpaho-mqtt3c ${Python_LIBRARIES})
+    target_link_libraries(${PROJECT_NAME} -lssl -lcrypto -lpaho-mqtt3cs ${Python_LIBRARIES})
 endif()
 
 # Set the build version 

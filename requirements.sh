@@ -55,6 +55,6 @@ git clone https://github.com/eclipse/paho.mqtt.c.git
 cd paho.mqtt.c
 mkdir build
 cd build
-cmake -DPAHO_BUILD_DOCUMENTATION=FALSE -DPAHO_WITH_SSL=FALSE -DPAHO_ENABLE_TESTING=FALSE ..
+cmake -DPAHO_BUILD_DOCUMENTATION=FALSE -DPAHO_WITH_SSL=TRUE -DPAHO_ENABLE_TESTING=FALSE ..
 make
 sudo make install
