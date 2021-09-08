@@ -775,7 +775,13 @@ void MQTTScripted::convertTimestamp(string& ts)
 {
 struct tm tm;
 char	buf[200];
+double  fraction = 0;
 
+	size_t pos = ts.find_first_of(".");
+	if (pos != string::npos)
+	{
+		fraction = strtod(ts.substr(pos).c_str(), NULL);
+	}
 	strptime(ts.c_str(), m_timeFormat.c_str(), &tm);
 	// Now adjust for the timezone
 	time_t tim = mktime(&tm);
@@ -783,4 +789,6 @@ char	buf[200];
 	gmtime_r(&tim, &tm);
 	strftime(buf, sizeof(buf), DEFAULT_DATE_TIME_FORMAT, &tm);
 	ts = buf;
+	snprintf(buf, sizeof(buf), "%1.6f", fraction);
+	ts += &buf[1];
 }
