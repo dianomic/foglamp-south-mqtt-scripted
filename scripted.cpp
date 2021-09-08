@@ -666,7 +666,7 @@ void MQTTScripted::processDocument(Document& doc, const string& asset)
 					convertTimestamp(user_ts);
 				}
 			}
-			if (m.value.IsInt64())
+			else if (m.value.IsInt64())
 			{
 				long v = m.value.GetInt64();
 				DatapointValue dpv(v);
@@ -727,7 +727,7 @@ void MQTTScripted::getValues(const Value& object, vector<Datapoint *>& points, b
 				convertTimestamp(user_ts);
 			}
 		}
-		if (m.value.IsInt64())
+		else if (m.value.IsInt64())
 		{
 			long v = m.value.GetInt64();
 			DatapointValue dpv(v);
