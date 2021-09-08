@@ -95,7 +95,7 @@ MQTTScripted::MQTTScripted(ConfigCategory *config) : m_python(NULL), m_restart(f
 		string mins = timezone.substr(res + 1);
 		num = strtol(mins.c_str(), NULL, 10);
 		num *= 60;
-		m_offset += 60;
+		m_offset += num;
 	}
 	m_script = config->getItemAttribute("script", ConfigCategory::FILE_ATTR);
 	m_content = config->getValue("script");
@@ -425,7 +425,7 @@ void MQTTScripted::reconfigure(const ConfigCategory& category)
 		string mins = timezone.substr(res + 1);
 		num = strtol(mins.c_str(), NULL, 10);
 		num *= 60;
-		m_offset += 60;
+		m_offset += num;
 	}
 
 	if (resubscribe)
