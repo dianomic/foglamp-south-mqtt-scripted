@@ -230,7 +230,7 @@ Document *doc = NULL;
 			}
 
 			doc = new Document();
-			auto& alloc = doc->GetAllocator();
+			Document::AllocatorType& alloc = doc->GetAllocator();
 			doc->SetObject();
 			PyObject *key = NULL;
 			PyObject *value = NULL;
@@ -257,6 +257,12 @@ Document *doc = NULL;
 				{
 					doc->AddMember(Value(name, alloc),Value(PyUnicode_AsUTF8(value), alloc), alloc);
 				}
+				else if (PyDict_Check(value))
+				{
+					Value child(kObjectType);
+					createJSON(value, child, alloc);
+					doc->AddMember(Value(name, alloc), child, alloc);
+				}
 				else
 				{
 					m_logger->error("Not adding data for '%s', unable to map type", name);
@@ -276,4 +282,44 @@ Document *doc = NULL;
 
 	PyGILState_Release(state);
 	return doc;
+}
+
+void PythonScript::createJSON(PyObject *pValue, Value& node, Document::AllocatorType& alloc)
+{
+PyObject *key = NULL;
+PyObject *value = NULL;
+Py_ssize_t pos = 0;
+
+	while (PyDict_Next(pValue, &pos, &key, &value))
+	{
+		const char *name = PyUnicode_Check(key) ? 
+			PyUnicode_AsUTF8(key)
+			: PyBytes_AsString(key);
+		if (PyLong_Check(value) || PyLong_Check(value))
+		{
+			node.AddMember(Value(name, alloc), Value((int64_t)PyLong_AsLong(value)), alloc);
+		}
+		else if (PyFloat_Check(value))
+		{
+			node.AddMember(Value(name, alloc),Value(PyFloat_AS_DOUBLE(value)), alloc);
+		}
+		else if (PyBytes_Check(value))
+		{
+			node.AddMember(Value(name, alloc),Value(PyBytes_AsString(value), alloc), alloc);
+		}
+		else if (PyUnicode_Check(value))
+		{
+			node.AddMember(Value(name, alloc),Value(PyUnicode_AsUTF8(value), alloc), alloc);
+		}
+		else if (PyDict_Check(value))
+		{
+			Value child(kObjectType);
+			createJSON(value, child, alloc);
+			node.AddMember(Value(name, alloc), child, alloc);
+		}
+		else
+		{
+			m_logger->error("Not adding data for '%s', unable to map type", name);
+		}
+	}
 }
