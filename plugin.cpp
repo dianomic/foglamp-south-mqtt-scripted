@@ -28,7 +28,7 @@ using namespace std;
 /**
  * Default configuration
  */
-const char *default_config = QUOTE({
+static const char *default_config = QUOTE({
 	"plugin" : {
        		"description" : "An MQTT plugin that supports Python script to convert the message payload",
 		"type" : "string",
