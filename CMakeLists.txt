@@ -68,6 +68,14 @@ else()
     include_directories(${Python_INCLUDE_DIRS})
 endif()
 
+if(${CMAKE_VERSION} VERSION_LESS "3.12.0")
+	set(PY_LIB "lib${PYTHON_LIBRARIES}.so")
+else()
+	set(PY_LIB "${Python_LIBRARIES}")
+endif()
+add_definitions(-DPLUGIN_PYTHON_SHARED_LIBRARY=${PY_LIB})
+message(STATUS "Setting -DPYTHON_SHARED_LIBRARY=${PY_LIB} for ${CMAKE_SYSTEM} on ${RELEASE_CODENAME}")
+
 if(${CMAKE_VERSION} VERSION_LESS "3.12.0") 
     link_directories(${PYTHON_LIBRARY_DIRS})
 else()
@@ -89,9 +97,9 @@ target_link_libraries(${PROJECT_NAME} ${NEEDED_FOGLAMP_LIBS})
 
 # Add additional libraries
 if(${CMAKE_VERSION} VERSION_LESS "3.12.0") 
-    target_link_libraries(${PROJECT_NAME} -lssl -lcrypto -lpaho-mqtt3c ${PYTHON_LIBRARIES})
+    target_link_libraries(${PROJECT_NAME} -lssl -lcrypto -lpaho-mqtt3cs ${PYTHON_LIBRARIES})
 else()
-    target_link_libraries(${PROJECT_NAME} -lssl -lcrypto -lpaho-mqtt3c ${Python_LIBRARIES})
+    target_link_libraries(${PROJECT_NAME} -lssl -lcrypto -lpaho-mqtt3cs ${Python_LIBRARIES})
 endif()
 
 # Set the build version 

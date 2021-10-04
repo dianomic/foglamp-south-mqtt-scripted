@@ -28,7 +28,7 @@ using namespace std;
 /**
  * Default configuration
  */
-const char *default_config = QUOTE({
+static const char *default_config = QUOTE({
 	"plugin" : {
        		"description" : "An MQTT plugin that supports Python script to convert the message payload",
 		"type" : "string",
@@ -51,19 +51,101 @@ const char *default_config = QUOTE({
 	       	"order" : "2",
 	       	"mandatory": "true"
 	       	},
+	"username" : {
+		"description" : "The username to use for the connection if any",
+		"type" : "string",
+	       	"default" : "",
+		"displayName" : "Username",
+	       	"order" : "3"
+		},
+	"password" : {
+		"description" : "The password for the user if using authentication",
+		"type" : "string",
+	       	"default" : "",
+		"displayName" : "Password",
+	       	"order" : "4",
+		"validity" : "username != \"\""
+		},
+	"serverCert" : {
+		"description" : "The name of the server certificate to be trusted. This should correspond to a PEM file stored in the FogLAMP certificate store",
+		"type" : "string",
+	       	"default" : "",
+		"displayName" : "Trusted Certificate",
+	       	"order" : "5"
+		},
+	"clientCert": {
+		"description" : "The certificate that will be used by the plugin to connect to the broker. This should correspond to a PEM file stored in the FogLAMP certificate store",
+		"type" : "string",
+	       	"default" : "",
+		"displayName" : "Client Certificate",
+	       	"order" : "6",
+		"validity" : "serverCert != \"\""
+		},
+	"key" : {
+		"description" : "The private key used by the client to create the client certificate. This may be left blank if it is included in the PEM file of the client certificate.",
+		"type" : "string",
+	       	"default" : "",
+		"displayName" : "Private Key",
+	       	"order" : "7",
+		"validity" : "clientCert != \"\""
+		},
+	"keyPass" : {
+		"description" : "The password used to encrypte the private key. This may be left blank if the private key is not encrypted.",
+		"type" : "password",
+	       	"default" : "",
+		"displayName" : "Key Password",
+	       	"order" : "8",
+		"validity" : "key != \"\""
+		},
 	"topic" : {
 		"description" : "The MQTT topic to which we subscribe to receive sensor messages",
 		"type" : "string",
 		"default" : "sensor",
-		"order": "3",
+		"order" : "9",
 		"displayName": "Topic",
 		"mandatory": "true"
+		},
+	"policy" : {
+		"description" : "The policy to choose when dealign with nested objects in the response payload or the response form the script.",
+		"type" : "enumeration",
+		"options" : [ "Single reading from root level", "Single reading & collapse",
+				"Single reading & nest", "Multiple readings & collapse",
+				"Multiple readings & nest" ],
+		"default" : "Single reading from root level",
+		"order" : "10",
+		"displayName": "Object Policy",
+		"mandatory": "true"
+		},
+	"timestamp" : {
+		"description" : "The name of a property that should be used as a timestamp. If left blank then the payload is assumed not to have a tiemstamp and readings are timestamped with the current date and time",
+		"type" : "string",
+		"default" : "",
+		"order" : "11",
+		"displayName": "Timestamp"
+		},
+	"format" : {
+       		"description" : "The format of timestamps to pass if using the time based data selection method and also the format of timestamps in the payload",
+		"type" : "string",
+	       	"default" : "",
+		"displayName" : "Time Format",
+	       	"order" : "13",
+	       	"mandatory": "false",
+		"validity": "timestamp != \"\""
+		},
+	"timezone" : {
+       		"description" : "The default timezone to use if none is specific. Timezones should be expressed as time offsets",
+		"type" : "string",
+	       	"default" : "+00:00",
+		"displayName" : "Timezone",
+	       	"order" : "12",
+	       	"mandatory": "false",
+		"validity": "timestamp != \"\""
 		},
 	"script" : {
 		"description" : "MQTT message translation Python script",
 		"type" : "script",
 		"default" : "",
-		"order": "4",
+		"order" : "14",
 		"displayName": "Script"
 		} 
 	});
@@ -100,7 +182,6 @@ PLUGIN_INFORMATION *plugin_info()
 PLUGIN_HANDLE plugin_init(ConfigCategory *config)
 {
 MQTTScripted	*mqtt;
-
 
 	mqtt = new MQTTScripted(config);
 	return (PLUGIN_HANDLE)mqtt;

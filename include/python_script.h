@@ -19,8 +19,12 @@ class PythonScript {
 		PythonScript(const std::string& name);
 		~PythonScript();
 		bool			setScript(const std::string& file);
-		rapidjson::Document	*execute(const std::string& message, const std::string& topic);
+		rapidjson::Document	*execute(const std::string& message, const std::string& topic,  std::string& asset);
 	private:
+		void createJSON(PyObject *pValue, rapidjson::Value& node, rapidjson::Document::AllocatorType& alloc);
+		void freeMemObj(PyObject *obj1);
+		void freeMemAll(PyObject *obj1, char *str, PyObject *obj3);
+
 		std::string		m_script;
 		bool			m_init;
 		Logger			*m_logger;
