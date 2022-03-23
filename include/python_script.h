@@ -12,6 +12,7 @@
 
 #include <logger.h>
 #include <Python.h>
+#include <pyruntime.h>
 #include <rapidjson/document.h>
 
 class PythonScript {
@@ -28,9 +29,9 @@ class PythonScript {
 		std::string		m_script;
 		bool			m_init;
 		Logger			*m_logger;
-		void			*m_libpythonHandle;
 		PyObject		*m_pFunc;
 		PyObject		*m_pModule;
+		PythonRuntime		*m_runtime;
 };
 
 #endif

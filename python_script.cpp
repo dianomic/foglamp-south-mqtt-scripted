@@ -21,44 +21,11 @@ using namespace rapidjson;
  *
  * @param name	The name of the south service
  */
-PythonScript::PythonScript(const string& name) : m_init(false), m_pFunc(NULL), m_libpythonHandle(NULL), m_pModule(NULL)
+PythonScript::PythonScript(const string& name) : m_init(false), m_pFunc(NULL), m_pModule(NULL)
 {
 	m_logger = Logger::getLogger();
-	wchar_t *programName = Py_DecodeLocale(name.c_str(), NULL);
-	Py_SetProgramName(programName);
-	PyMem_RawFree(programName);
 
-	if (!Py_IsInitialized())
-	{
-#ifdef PLUGIN_PYTHON_SHARED_LIBRARY
-		string openLibrary = TO_STRING(PLUGIN_PYTHON_SHARED_LIBRARY);
-		if (!openLibrary.empty())
-		{
-			m_libpythonHandle = dlopen(openLibrary.c_str(),
-						  RTLD_LAZY | RTLD_LOCAL);
-			m_logger->info("Pre-loading of library '%s' "
-						  "is needed on this system",
-						  openLibrary.c_str());
-		}
-#endif
-		Py_Initialize();
-		//PyEval_InitThreads(); // Initialize and acquire the global interpreter lock (GIL)
-		PyThreadState* save = PyEval_SaveThread(); // release GIL
-		m_init = true;
-	}
-
-	PyGILState_STATE state = PyGILState_Ensure(); // acquire GIL
-
-	// Set Python path for embedded Python 3.5
-	// Get current sys.path. borrowed reference
-	PyObject* sysPath = PySys_GetObject((char *)string("path").c_str());
-	// Add FogLAMP python filters path
-	string path = getDataDir() + "/scripts";
-	PyObject* pPath = PyUnicode_DecodeFSDefault((char *)path.c_str());
-	PyList_Insert(sysPath, 0, pPath);
-	// Remove temp object
-	Py_CLEAR(pPath);
-	PyGILState_Release(state);
+	m_runtime = PythonRuntime::getPythonRuntime();
 }
 
 /**
@@ -66,24 +33,6 @@ PythonScript::PythonScript(const string& name) : m_init(false), m_pFunc(NULL), m
  */
 PythonScript::~PythonScript()
 {
-	if (m_init)
-	{
-		if (Py_IsInitialized())
-		{
-			PyGILState_STATE state = PyGILState_Ensure();
-			Py_CLEAR(m_pFunc);
-			Py_CLEAR(m_pModule);
-			Py_Finalize();
-
-			m_init = false;
-
-			if (m_libpythonHandle)
-			{
-				dlclose(m_libpythonHandle);
-			}
-
-		}
-	}
 }
 
 /**
