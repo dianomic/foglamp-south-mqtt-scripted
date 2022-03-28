@@ -15,6 +15,8 @@
 using namespace std;
 using namespace rapidjson;
 
+void logError();
+
 /**
  * Constructor for the PythonScript class that is used to
  * convert the message payload
@@ -25,7 +27,28 @@ PythonScript::PythonScript(const string& name) : m_init(false), m_pFunc(NULL), m
 {
 	m_logger = Logger::getLogger();
 
+	// Set python program name
+	wchar_t *programName = Py_DecodeLocale(name.c_str(), NULL);
+	Py_SetProgramName(programName);
+	PyMem_RawFree(programName);
+
+	// Inititialise embedded Python
 	m_runtime = PythonRuntime::getPythonRuntime();
+
+	PyGILState_STATE state = PyGILState_Ensure(); // acquire GIL
+
+	// Set Python path for embedded Python 3.5
+	// Get current sys.path. borrowed reference
+	PyObject* sysPath = PySys_GetObject((char *)string("path").c_str());
+	// Add FogLAMP python filters path
+	string path = getDataDir() + "/scripts";
+	PyObject* pPath = PyUnicode_DecodeFSDefault((char *)path.c_str());
+	PyList_Insert(sysPath, 0, pPath);
+	// Remove temp object
+	Py_CLEAR(pPath);
+	PyGILState_Release(state);
+
+	m_init = true;
 }
 
 /**
@@ -33,6 +56,7 @@ PythonScript::PythonScript(const string& name) : m_init(false), m_pFunc(NULL), m
  */
 PythonScript::~PythonScript()
 {
+	m_init = false;
 }
 
 /**
@@ -55,45 +79,69 @@ bool PythonScript::setScript(const string& name)
 	{
 		start = 0;
 	}
-	m_script = name.substr(start);
-	size_t end = m_script.rfind(".py");
-	if (end != std::string::npos)
-	{
-		m_script = m_script.substr(0, end);
-	}
 	PyGILState_STATE state = PyGILState_Ensure();
 
-	PyObject *pName = PyUnicode_FromString((char *)m_script.c_str());
-	if (m_pModule)
+	string scriptName = name.substr(start);
+	size_t end = scriptName.rfind(".py");
+	if (end != std::string::npos)
 	{
+		scriptName = scriptName.substr(0, end);
+	}
+
+	// Load or reload script into Python module object
+	if (m_script == scriptName)
+	{
+		m_logger->debug("Python reload module %s", m_script.c_str());
+
 		PyObject *new_module = PyImport_ReloadModule(m_pModule);
-		Py_CLEAR(m_pModule);
+		if (m_pModule)
+		{
+			Py_CLEAR(m_pModule);
+			Py_CLEAR(m_pFunc);
+		}
 		m_pModule = new_module;
 	}
 	else
 	{
+		PyObject *pName = PyUnicode_FromString((char *)scriptName.c_str());
+		if (m_pModule)
+		{
+			Py_CLEAR(m_pModule);
+			Py_CLEAR(m_pFunc);
+		}
+		m_logger->debug("Python load module %s", scriptName.c_str());
+
 		m_pModule = PyImport_Import(pName);
+
+		Py_CLEAR(pName);
 	}
-	Py_CLEAR(pName);
+
 	if (!m_pModule)
 	{
-		m_logger->error("Failed to import script %s", m_script.c_str());
+		m_logger->error("Failed to import script '%s'", scriptName.c_str());
+
+		logError();
+
+		PyGILState_Release(state);
+
 		return false;
 	}
-	PyObject *pDict = PyModule_GetDict(m_pModule);
-	if (pDict)
+
+	// Set member variable
+	m_script = scriptName;
+
+	Py_CLEAR(m_pFunc);
+	m_pFunc = PyObject_GetAttrString(m_pModule, (char*)"convert");
+	if (!m_pFunc)
 	{
-		PyObject *new_func =  PyDict_GetItemString(pDict, (char*)"convert");
-		Py_CLEAR(m_pFunc);
-		m_pFunc = new_func;
-		Py_CLEAR(pDict);
+		m_logger->error("Unable to fetch 'convert' function " \
+				"from imported Python module '%s'",
+				m_script.c_str());
 	}
-	else
-	{
-		m_logger->error("Unable to extract dictionary from imported Python module");
-	}
+
 	PyGILState_Release(state);
-	return true;
+
+	return m_pFunc != NULL;;
 }
 
 /**
@@ -272,3 +320,24 @@ Py_ssize_t pos = 0;
 		}
 	}
 }
+
+// Log error utility
+void logError()
+{
+PyObject *ptype, *pvalue, *ptraceback;
+
+	if (PyErr_Occurred())
+	{
+		PyErr_Fetch(&ptype, &pvalue, &ptraceback);
+		if (PyBytes_Check(pvalue))
+			Logger::getLogger()->error("Python error: %s", PyBytes_AsString(pvalue));
+		else if (PyUnicode_Check(pvalue))
+			Logger::getLogger()->error("Python error: %s", PyUnicode_AsUTF8(pvalue));
+		else
+		{
+			Logger::getLogger()->error("Unable to determine type of error string");
+		}
+		PyErr_Clear();
+	}
+}
+
