@@ -95,7 +95,7 @@ When adding a south service with this plugin the same flow is used as with any o
 
 
 Object Policy
-=============
+-------------
 
 The object policy is used by the plugin to determine how it deals with nested objects within the JSON that is in the MQTT payload or the JSON that is returned from the script that is executed, if present.
 
@@ -144,8 +144,6 @@ If the policy is set to *Multiple readings & collapse* there would be three read
 
 If the policy is set to *Multiple readings & nest* there would be three readings created from this payload; one that is names as per the asset name in the configuration, a *motor* reading and a *temperature* reading. The first of these readings would have data points called *name* and *flow*, the *motor* reading would have data points *current* and *speed*. The *temperatures* reading would have data points *bearing*, *impeller* and *motor*, the *motor* data point would have two child data points *casing* and *gearbox*.
 
-
-
 Timestamp Treatment
 -------------------
 
@@ -162,7 +160,7 @@ The timestamp data point should be a string and the timestamp should
 be formatted to match the definition given in the *Time format*
 configuration parameter. The format is based on the standard Linux
 strptime formatting options and is discussed below in the section
-discussing the :ref:ref::`time_format` selection method.
+discussing the :ref:`time_format` selection method.
 
 
 The timezone may be set by using the *Timezone* configuration parameter
