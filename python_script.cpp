@@ -70,6 +70,9 @@ bool PythonScript::setScript(const string& name)
 {
 	m_logger->info("Script to execute is '%s'", name.c_str());
 
+	m_failedScript = false;
+	m_execCount = 0;
+
 	size_t start = name.find_last_of("/");
 	if (start != std::string::npos)
 	{
@@ -123,7 +126,7 @@ bool PythonScript::setScript(const string& name)
 		logError();
 
 		PyGILState_Release(state);
-
+		m_failedScript = true;
 		return false;
 	}
 
@@ -134,9 +137,8 @@ bool PythonScript::setScript(const string& name)
 	m_pFunc = PyObject_GetAttrString(m_pModule, (char*)"convert");
 	if (!m_pFunc)
 	{
-		m_logger->error("Unable to fetch 'convert' function " \
-				"from imported Python module '%s'",
-				m_script.c_str());
+		m_logger->error("The supplied script does not define a function called 'convert'");
+		m_failedScript = true;
 	}
 
 	PyGILState_Release(state);
@@ -156,6 +158,17 @@ Document *PythonScript::execute(const string& message, const string& topic, stri
 {
 Document *doc = NULL;
 
+	if (m_failedScript)
+	{
+		m_execCount++;
+		if (m_execCount > 100)
+		{
+			m_logger->warn("The plugin is unable to process data without a valid 'convert' funtion in the script.");
+			m_execCount = 0;
+		}
+		return doc;
+	}
+
 	PyGILState_STATE state = PyGILState_Ensure();
 	if (m_pFunc)
 	{
@@ -169,61 +182,101 @@ Document *doc = NULL;
 			try {
 				pReturn = PyObject_CallFunction(m_pFunc, "ss", message.c_str(), topic.c_str());
 			} catch (exception& e) {
-				m_logger->error("Python script execution failed: %s", e.what());
+				m_logger->error("Execution of the convert Python function failed: %s", e.what());
 				return NULL;
 			}
 
 			if (!pReturn)
 			{
-				m_logger->error("Python convert function failed to return data");
+				logError();
+				return NULL;
+			}
+			else if (pReturn == Py_None)
+			{
+				doc = new Document();
+				auto& alloc = doc->GetAllocator();
+				doc->SetObject();
+				return doc;
+			}
+			else if (PyTuple_Check(pReturn))
+			{
+				if (PyArg_ParseTuple(pReturn, "O|O", &assetObject, &dict) == false)
+				{
+
+					m_logger->error("Return from Python convert function is of an incorrect type, it should be a Python DICT object or a string with the asset code and a DICT object with the reading data");
+					Py_CLEAR(pReturn);
+					m_failedScript = true;
+					m_execCount = 0;
+					return NULL;
+				}
+
+				if (assetObject == NULL)
+				{
+
+					m_logger->error("When the return from the Python convert function is a pair of values the first of these must be a string containing the asset code");
+					Py_CLEAR(pReturn);
+					m_failedScript = true;
+					m_execCount = 0;
+					return NULL;
+
+				}
+				else if (assetObject == Py_None)
+				{
+
+					m_logger->error("The returned asset name was None, either a valid string must be returned or the asset name may be omitted");
+					Py_CLEAR(pReturn);
+					m_failedScript = true;
+					m_execCount = 0;
+					return NULL;
+
+				}
+				else if (dict == NULL)
+				{
+
+					m_logger->error("Return from Python convert function is of an incorrect type, it should be a Python DICT object or a string with the asset code and a DICT object with the reading data");
+					Py_CLEAR(pReturn);
+					m_failedScript = true;
+					m_execCount = 0;
+					return NULL;
+
+				}
+				else if (dict == Py_None)
+				{
+					const char *name = PyUnicode_Check(assetObject) ? 
+							PyUnicode_AsUTF8(assetObject) : PyBytes_AsString(assetObject);
+					asset = name;
+					doc = new Document();
+					auto& alloc = doc->GetAllocator();
+					doc->SetObject();
+					return doc;
+				}
+				else  if (! PyDict_Check(dict))
+				{
+
+					m_logger->error("When the return from the Python convert function is a pair of values the second of these must be a Python DICT");
+					Py_CLEAR(pReturn);
+					m_failedScript = true;
+					m_execCount = 0;
+					return NULL;
+				}
+
+				const char *name = PyUnicode_Check(assetObject) ?
+						PyUnicode_AsUTF8(assetObject) : PyBytes_AsString(assetObject);
+				asset = name;
+				pValue = dict;
+
+			}
+			else if (!PyDict_Check(pReturn))
+			{
+				m_logger->error("Return from Python convert function is of an incorrect type, it should be a Python DICT object or a DICT object and a string");
+				Py_CLEAR(pReturn);
+				m_failedScript = true;
+				m_execCount = 0;
 				return NULL;
 			}
 			else
 			{
-				if (PyTuple_Check(pReturn)) {
-					if (PyArg_ParseTuple(pReturn, "O|O", &assetObject, &dict) == false) {
-
-						m_logger->error("a STRING and a DICT are expected as return values from the Python convert function");
-						Py_CLEAR(pReturn);
-						return NULL;
-					}
-
-					if (assetObject == NULL){
-
-						m_logger->error("a STRING is expected as the first value returned by the Python convert function");
-						Py_CLEAR(pReturn);
-						return NULL;
-
-					} else if (dict == NULL){
-
-						m_logger->error("a DICT is expected as the second value returned by the Python convert function");
-						Py_CLEAR(pReturn);
-						return NULL;
-
-					} else {
-						if (! PyDict_Check(dict)){
-
-							m_logger->error("a DICT is expected as the second value returned by the Python convert function");
-							Py_CLEAR(pReturn);
-							return NULL;
-						}
-					}
-
-					const char *name = PyUnicode_Check(assetObject) ?
-						PyUnicode_AsUTF8(assetObject) : PyBytes_AsString(assetObject);
-					asset = name;
-					pValue = dict;
-
-				} else {
-					if (!PyDict_Check(pReturn))
-					{
-						m_logger->error("Return from Python convert function is not a DICT object");
-						Py_CLEAR(pReturn);
-						return NULL;
-					}
-					pValue = pReturn;
-				}
-
+				pValue = pReturn;
 			}
 
 			doc = new Document();
@@ -274,11 +327,77 @@ Document *doc = NULL;
 	}
 	else
 	{
-		m_logger->fatal("Unable to create Python reference to function \"convert\"");
+		m_logger->fatal("The supplied Python script does not define a valid \"convert\" function");
 	}
 
 	PyGILState_Release(state);
 	return doc;
+}
+
+/**
+ * Log an error from the Python interpreter
+ */
+void PythonScript::logError()
+{
+PyObject *ptype, *pvalue, *ptraceback;
+
+	if (PyErr_Occurred())
+	{
+		PyErr_Fetch(&ptype, &pvalue, &ptraceback);
+		PyErr_NormalizeException(&ptype,&pvalue,&ptraceback);
+
+		char *msg, *file, *text;
+		int line, offset;
+
+		int res = PyArg_ParseTuple(pvalue,"s(siis)",&msg,&file,&line,&offset,&text);
+
+		PyObject *line_no = PyObject_GetAttrString(pvalue,"lineno");
+		PyObject *line_no_str = PyObject_Str(line_no);
+		PyObject *line_no_unicode = PyUnicode_AsEncodedString(line_no_str,"utf-8", "Error");
+		char *actual_line_no = PyBytes_AsString(line_no_unicode);  // Line number
+
+		PyObject *ptext = PyObject_GetAttrString(pvalue,"text");
+		PyObject *ptext_str = PyObject_Str(ptext);
+		PyObject *ptext_no_unicode = PyUnicode_AsEncodedString(ptext_str,"utf-8", "Error");
+		char *error_line = PyBytes_AsString(ptext_no_unicode);  // Line in error
+
+		// Remove the trailing newline from the string
+		char *newline = rindex(error_line,  '\n');
+		if (newline)
+		{
+			*newline = '\0';
+		}
+
+		// Not managed to find a way to get the actual error message from Python
+		// so use the string representation of the Error class and tidy it up, e.g.
+		// SyntaxError('invalid syntax', ('/tmp/scripts/test_addition_script_script.py', 9, 1, '}\n'))
+		PyObject *pstr = PyObject_Repr(pvalue);
+		PyObject *perr = PyUnicode_AsEncodedString(pstr, "utf-8", "Error");
+		char *err_msg = PyBytes_AsString(perr);
+		char *end = index(err_msg, ',');
+		if (end)
+		{
+			*end = '\0';
+		}
+		end = index(err_msg, '(');
+		if (end)
+		{
+			*end = ' ';
+		}
+
+
+		if (error_line == NULL || actual_line_no == NULL || strcmp(error_line, "<NULL>") == 0
+			       	|| strcmp(actual_line_no, "<NULL>") == 0)
+		{
+			m_logger->error("Python error: %s in supplied script", err_msg);
+		}
+		else
+		{
+			m_logger->error("Python error: %s in %s at line %s of supplied script", err_msg, error_line, actual_line_no);
+		}
+
+		PyErr_Clear();
+	}
 }
 
 void PythonScript::createJSON(PyObject *pValue, Value& node, Document::AllocatorType& alloc)
@@ -320,24 +439,3 @@ Py_ssize_t pos = 0;
 		}
 	}
 }
-
-// Log error utility
-void logError()
-{
-PyObject *ptype, *pvalue, *ptraceback;
-
-	if (PyErr_Occurred())
-	{
-		PyErr_Fetch(&ptype, &pvalue, &ptraceback);
-		if (PyBytes_Check(pvalue))
-			Logger::getLogger()->error("Python error: %s", PyBytes_AsString(pvalue));
-		else if (PyUnicode_Check(pvalue))
-			Logger::getLogger()->error("Python error: %s", PyUnicode_AsUTF8(pvalue));
-		else
-		{
-			Logger::getLogger()->error("Unable to determine type of error string");
-		}
-		PyErr_Clear();
-	}
-}
-
