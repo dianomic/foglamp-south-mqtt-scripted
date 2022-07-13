@@ -391,9 +391,13 @@ PyObject *ptype, *pvalue, *ptraceback;
 			*end = ' ';
 		}
 
-
-		if (error_line == NULL || actual_line_no == NULL || strcmp(error_line, "<NULL>") == 0
-			       	|| strcmp(actual_line_no, "<NULL>") == 0)
+		if (strncmp(err_msg, "TypeError \"convert()", strlen("TypeError \"convert()")) == 0)
+		{
+			// Special catch to give better error message
+			m_logger->error("The convert function defined in the Python script not have the correct number of arguments defined");
+		}
+		else if (error_line == NULL || actual_line_no == NULL || strcmp(error_line, "<NULL>") == 0
+			       	|| strcmp(actual_line_no, "<NULL>") == 0 || *error_line == 0)
 		{
 			m_logger->error("Python error: %s in supplied script", err_msg);
 		}
