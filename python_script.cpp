@@ -92,7 +92,7 @@ bool PythonScript::setScript(const string& name)
 	}
 
 	// Load or reload script into Python module object
-	if (m_script == scriptName)
+	if (m_script == scriptName && m_pModule)
 	{
 		m_logger->debug("Python reload module %s", m_script.c_str());
 
@@ -121,8 +121,6 @@ bool PythonScript::setScript(const string& name)
 
 	if (!m_pModule)
 	{
-		m_logger->error("Failed to import script '%s'", scriptName.c_str());
-
 		logError();
 
 		PyGILState_Release(state);
@@ -262,6 +260,14 @@ Document *doc = NULL;
 
 				const char *name = PyUnicode_Check(assetObject) ?
 						PyUnicode_AsUTF8(assetObject) : PyBytes_AsString(assetObject);
+				if (! *name)
+				{
+					m_logger->error("An empty asset name has been returned by the sccript. Asset names can not be empty");
+					Py_CLEAR(pReturn);
+					m_failedScript = true;
+					m_execCount = 0;
+					return NULL;
+				}
 				asset = name;
 				pValue = dict;
 
