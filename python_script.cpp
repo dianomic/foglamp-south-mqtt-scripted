@@ -240,8 +240,23 @@ Document *doc = NULL;
 				}
 				else if (dict == Py_None)
 				{
-					const char *name = PyUnicode_Check(assetObject) ? 
-							PyUnicode_AsUTF8(assetObject) : PyBytes_AsString(assetObject);
+					const char *name;
+					if (PyUnicode_Check(assetObject))
+					{
+						name = PyUnicode_AsUTF8(assetObject);
+					}
+					else if (PyBytes_Check(assetObject))
+					{
+						PyBytes_AsString(assetObject);
+					}
+					else
+					{
+						m_logger->error("When the return from the Python convert function is a pair of values the first of these must be a string contianing the asset name");
+						Py_CLEAR(pReturn);
+						m_failedScript = true;
+						m_execCount = 0;
+						return NULL;
+					}
 					asset = name;
 					doc = new Document();
 					auto& alloc = doc->GetAllocator();
@@ -258,8 +273,23 @@ Document *doc = NULL;
 					return NULL;
 				}
 
-				const char *name = PyUnicode_Check(assetObject) ?
-						PyUnicode_AsUTF8(assetObject) : PyBytes_AsString(assetObject);
+				const char *name;
+			       	if (PyUnicode_Check(assetObject))
+				{
+					name = PyUnicode_AsUTF8(assetObject);
+				}
+				else if (PyBytes_Check(assetObject))
+				{
+					PyBytes_AsString(assetObject);
+				}
+				else
+				{
+					m_logger->error("When the return from the Python convert function is a pair of values the first of these must be a string contianing the asset name");
+					Py_CLEAR(pReturn);
+					m_failedScript = true;
+					m_execCount = 0;
+					return NULL;
+				}
 				if (! *name)
 				{
 					m_logger->error("An empty asset name has been returned by the sccript. Asset names can not be empty");
