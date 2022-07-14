@@ -1,6 +1,25 @@
 .. Images
 .. |mqtt_01| image:: images/mqtt_01.jpg
 .. |mqtt_02| image:: images/mqtt_02.jpg
+.. |logview_1| image:: images/logview_1.png
+.. |logview_2| image:: images/logview_2.png
+
+.. Links
+.. |assetsplit| raw:: html
+
+   <a href="../foglamp-filter-asset-split/index.html">foglamp-filter-asset-split</a>
+   
+.. |asset raw:: html
+
+   <a href="../foglamp-filter-asset/index.html">foglamp-filter-asset</a>
+   
+.. |rename| raw:: html
+
+   <a href="../foglamp-filter-asset/rename.html">foglamp-filter-rename</a>
+   
+.. |replace| raw:: html
+
+   <a href="../foglamp-filter-asset/replace.html">foglamp-filter-replace</a>
 
 MQTT South with Payload Scripting
 =================================
@@ -57,6 +76,23 @@ Second case sample:
     def convert(message, topic):
         return "ExternalTEMP",  {"temperature_3": 11.3}
 
+Limitations & Recommendations
+-----------------------------
+
+When a script is provided it is best practice to do the minimum required
+to allow the data to be ingested into the FogLAMP data pipeline. Further
+processing to shape the data to exact requirements can often be done using
+an existing filter. The advantages of this are twofold; it simplifies the
+scripts required here and it simplifies maintenance should the data be
+required in a different format some time later.
+
+Other filters exists, such as |rename| and |replace| that allow assets
+and data points to be renamed or to use regular expressions to substitute
+portions of asset names and data points. Filters such as these can be
+applied to the result of the MQTT scripted filter to convert the data
+into the form required and maintain a simpler Python script, or obviate
+the need for a Python script, in the MQTT scripted plugin.
+
 Configuration
 -------------
 
@@ -66,7 +102,7 @@ When adding a south service with this plugin the same flow is used as with any o
 | |mqtt_01| |
 +-----------+
 
-  - **Asset Name**: The name of the asset the plugin will create for each message, unless the convert function returns an explict asset name to be used.
+  - **Asset Name**: The name of the asset the plugin will create for each message, unless the convert function returns an explicit asset name to be used.
 
   - **MQTT Broker**: The IP address/hostname of the MQTT broker to use. Note FogLAMP requires an external MQTT broker is run currently and does not provide an internal broker in the current release.
 
@@ -251,3 +287,56 @@ The format of the timestamps read in the message payload or by the script return
    %Y
         The year, including century (for example, 1991).
 
+
+Script Error Handling
+---------------------
+
+If an error occurs in the plugin or Python script, including script coding errors and Python exception,  details will be logged to the error log and data will not flow through the pipeline to the next filter or into the storage service.
+
+Warnings raised will also be logged to the error log but will not cause data to cease flowing through the pipeline.
+
+To view the error log you may examine the file directly on your host machine, for example */var/log/syslog* on a Ubuntu host, however it is also possible to view the error logs specific to Fledge from the Fledge user interface. Select the *System* option under *Logs* in the left hand menu pane. You may then filter the logs for a specific service to see only those logs that refer to the service which uses the filter you are interested in.
+
++-------------+
+| |logview_1| |
++-------------+
+
+Alternatively if you open the dialog for the service in the *South* or *North* menu items you will see two icons displayed in the bottom left corner of the dialog that lets you alter the configuration of the service.
+
++-------------+
+| |logview_2| |
++-------------+
+
+The left most icon, with the *?* in a circle, allows you to view the documentation for the plugin, the right most icon, which looks like a page of text with a corner folded over, will open the log view page filtered to view the service.
+
+Error Messages & Warnings
+#########################
+
+The following are some errors you may see within the log with some description of the cause and remedy for the error.
+
+The supplied Python script does not define a valid "convert" function
+    The script that has been supplied does not define a Python function called convert. The script must provide a single function called convert that accepts the MQTT payload and topic and will process these to provide the JSON DICT and an optional asset name to import.
+
+Python error: IndentationError 'expected an indented block' in XXXX at line Y of script
+    The script supplied does not conform to Python requirements for code block indentation. The text XXXX will be replaced with the line of text in error and Y with the line number within the script.
+
+Python error: SyntaxError 'invalid syntax' in XXXX at line Y of script
+    The script supplied does has invalid Python syntax. The text XXXX will be replaced with the line of text in error and Y with the line number within the script.
+
+Python error: ModuleNotFoundError "No module named 'nosuchpakage'" in supplied script
+    The script supplied is attempting to import a Python module that is not available.
+
+Python error: TypeError "convert() missing 1 required positional argument: 'name'" in supplied script
+    The type of the convert function has been incorrectly defined. The convert function should take a single argument which is the message to process.
+
+Return from Python convert function is of an incorrect type, it should be a Python DICT object or a DICT object and a string
+    The convert function is returning data of an incorrect type. It may either return a Python DICT, which may be empty, None or a string and a Python DICT.
+
+The plugin is unable to process data without a valid 'convert' function in the script.
+    This warning will periodically be logged following an earlier error that has resulted in an error which prevents the Python convert function from processing the messages. Fix the earlier error to stop this warning being logged.
+
+Unable to process message 'XXXX' expecting a simple value
+    This warning is logged if there is no script defended for the plugin and the message is not simply a numeric value. In this case a Python script should be added that processes the payload.
+
+The returned asset name was None, either a valid string must be returned or the asset name may be omitted
+    The python script has returned a pair of values, but the asset name returned is None. If an asset naem is returned it must be a string. If no asset name is required then it can be omitted from the return value of the script.

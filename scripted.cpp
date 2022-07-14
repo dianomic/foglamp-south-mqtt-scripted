@@ -504,7 +504,7 @@ Document doc;
 			}
 			else
 			{
-				Logger::getLogger()->warn("Unable to process simple value: '%s'",
+				Logger::getLogger()->warn("Unable to process message '%s' expecting a simple value",
 						message.c_str());
 			}
 		}
@@ -527,8 +527,8 @@ Document doc;
 
 		if (d)
 		{
-			if (asset.empty()) {
-
+			if (asset.empty())
+			{
 				asset = m_asset;
 			}
 			processDocument(*d, asset);
@@ -633,10 +633,13 @@ void MQTTScripted::processDocument(Document& doc, const string& asset)
 		vector<Datapoint *> points;
 		string ts;
 		getValues(doc.GetObject(), points, false, ts);
-		Reading reading(asset, points);
-		if (!ts.empty())
-			reading.setUserTimestamp(ts);
-		(*m_ingest)(m_data, reading);
+		if (points.size() > 0)
+		{
+			Reading reading(asset, points);
+			if (!ts.empty())
+				reading.setUserTimestamp(ts);
+			(*m_ingest)(m_data, reading);
+		}
 	}
 	else if (m_policy == mPolicyCollapse)
 	{
@@ -644,10 +647,13 @@ void MQTTScripted::processDocument(Document& doc, const string& asset)
 		vector<Datapoint *> points;
 		string ts;
 		getValues(doc.GetObject(), points, true, ts);
-		Reading reading(asset, points);
-		if (!ts.empty())
-			reading.setUserTimestamp(ts);
-		(*m_ingest)(m_data, reading);
+		if (points.size() > 0)
+		{
+			Reading reading(asset, points);
+			if (!ts.empty())
+				reading.setUserTimestamp(ts);
+			(*m_ingest)(m_data, reading);
+		}
 	}
 	else if (m_policy == mPolicyMultiple)
 	{
@@ -687,10 +693,13 @@ void MQTTScripted::processDocument(Document& doc, const string& asset)
 				string ts;
 				vector<Datapoint *> children;
 				getValues(m.value, children, true, ts);
-				Reading reading(m.name.GetString(), children);
-				if (!ts.empty())
-					reading.setUserTimestamp(ts);
-				(*m_ingest)(m_data, reading);
+				if (children.size() > 0)
+				{
+					Reading reading(m.name.GetString(), children);
+					if (!ts.empty())
+						reading.setUserTimestamp(ts);
+					(*m_ingest)(m_data, reading);
+				}
 			}
 		}
 		if (points.size() > 0)
