@@ -284,7 +284,7 @@ Document *doc = NULL;
 				}
 				else
 				{
-					m_logger->error("When the return from the Python convert function is a pair of values the first of these must be a string contianing the asset name");
+					m_logger->error("When the return from the Python convert function is a pair of values the first of these must be a string containing the asset name");
 					Py_CLEAR(pReturn);
 					m_failedScript = true;
 					m_execCount = 0;
@@ -292,7 +292,7 @@ Document *doc = NULL;
 				}
 				if (! *name)
 				{
-					m_logger->error("An empty asset name has been returned by the sccript. Asset names can not be empty");
+					m_logger->error("An empty asset name has been returned by the script. Asset names can not be empty");
 					Py_CLEAR(pReturn);
 					m_failedScript = true;
 					m_execCount = 0;
