@@ -97,6 +97,17 @@ bool PythonScript::setScript(const string& name)
 		m_logger->debug("Python reload module %s", m_script.c_str());
 
 		PyObject *new_module = PyImport_ReloadModule(m_pModule);
+		// The reload has failed but the previous module still
+		// exists so we must keep the old m_pModule value such
+		// that next time we do a reimport rather then a load module
+		if (!new_module)
+		{
+			logError();
+
+			PyGILState_Release(state);
+			m_failedScript = true;
+			return false;
+		}
 		if (m_pModule)
 		{
 			Py_CLEAR(m_pModule);
