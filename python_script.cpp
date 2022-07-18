@@ -97,6 +97,17 @@ bool PythonScript::setScript(const string& name)
 		m_logger->debug("Python reload module %s", m_script.c_str());
 
 		PyObject *new_module = PyImport_ReloadModule(m_pModule);
+		// The reload has failed but the previous module still
+		// exists so we must keep the old m_pModule value such
+		// that next time we do a reimport rather then a load module
+		if (!new_module)
+		{
+			logError();
+
+			PyGILState_Release(state);
+			m_failedScript = true;
+			return false;
+		}
 		if (m_pModule)
 		{
 			Py_CLEAR(m_pModule);
@@ -240,8 +251,23 @@ Document *doc = NULL;
 				}
 				else if (dict == Py_None)
 				{
-					const char *name = PyUnicode_Check(assetObject) ? 
-							PyUnicode_AsUTF8(assetObject) : PyBytes_AsString(assetObject);
+					const char *name;
+					if (PyUnicode_Check(assetObject))
+					{
+						name = PyUnicode_AsUTF8(assetObject);
+					}
+					else if (PyBytes_Check(assetObject))
+					{
+						PyBytes_AsString(assetObject);
+					}
+					else
+					{
+						m_logger->error("When the return from the Python convert function is a pair of values the first of these must be a string contianing the asset name");
+						Py_CLEAR(pReturn);
+						m_failedScript = true;
+						m_execCount = 0;
+						return NULL;
+					}
 					asset = name;
 					doc = new Document();
 					auto& alloc = doc->GetAllocator();
@@ -258,11 +284,26 @@ Document *doc = NULL;
 					return NULL;
 				}
 
-				const char *name = PyUnicode_Check(assetObject) ?
-						PyUnicode_AsUTF8(assetObject) : PyBytes_AsString(assetObject);
+				const char *name;
+			       	if (PyUnicode_Check(assetObject))
+				{
+					name = PyUnicode_AsUTF8(assetObject);
+				}
+				else if (PyBytes_Check(assetObject))
+				{
+					PyBytes_AsString(assetObject);
+				}
+				else
+				{
+					m_logger->error("When the return from the Python convert function is a pair of values the first of these must be a string containing the asset name");
+					Py_CLEAR(pReturn);
+					m_failedScript = true;
+					m_execCount = 0;
+					return NULL;
+				}
 				if (! *name)
 				{
-					m_logger->error("An empty asset name has been returned by the sccript. Asset names can not be empty");
+					m_logger->error("An empty asset name has been returned by the script. Asset names can not be empty");
 					Py_CLEAR(pReturn);
 					m_failedScript = true;
 					m_execCount = 0;
