@@ -9,14 +9,14 @@
 
    <a href="../foglamp-filter-asset-split/index.html">foglamp-filter-asset-split</a>
    
-.. |asset raw:: html
+.. |asset| raw:: html
 
    <a href="../foglamp-filter-asset/index.html">foglamp-filter-asset</a>
-   
+
 .. |rename| raw:: html
 
    <a href="../foglamp-filter-asset/rename.html">foglamp-filter-rename</a>
-   
+
 .. |replace| raw:: html
 
    <a href="../foglamp-filter-asset/replace.html">foglamp-filter-replace</a>
@@ -310,7 +310,7 @@ Alternatively if you open the dialog for the service in the *South* or *North* m
 The left most icon, with the *?* in a circle, allows you to view the documentation for the plugin, the right most icon, which looks like a page of text with a corner folded over, will open the log view page filtered to view the service.
 
 Error Messages & Warnings
-#########################
+-------------------------
 
 The following are some errors you may see within the log with some description of the cause and remedy for the error.
 
@@ -323,7 +323,7 @@ Python error: IndentationError 'expected an indented block' in XXXX at line Y of
 Python error: SyntaxError 'invalid syntax' in XXXX at line Y of script
     The script supplied does has invalid Python syntax. The text XXXX will be replaced with the line of text in error and Y with the line number within the script.
 
-Python error: ModuleNotFoundError "No module named 'nosuchpakage'" in supplied script
+Python error: ModuleNotFoundError "No module named 'nosuchpackage'" in supplied script
     The script supplied is attempting to import a Python module that is not available.
 
 Python error: TypeError "convert() missing 1 required positional argument: 'name'" in supplied script
@@ -339,4 +339,4 @@ Unable to process message 'XXXX' expecting a simple value
     This warning is logged if there is no script defended for the plugin and the message is not simply a numeric value. In this case a Python script should be added that processes the payload.
 
 The returned asset name was None, either a valid string must be returned or the asset name may be omitted
-    The python script has returned a pair of values, but the asset name returned is None. If an asset naem is returned it must be a string. If no asset name is required then it can be omitted from the return value of the script.
+    The python script has returned a pair of values, but the asset name returned is None. If an asset name is returned it must be a string. If no asset name is required then it can be omitted from the return value of the script.
