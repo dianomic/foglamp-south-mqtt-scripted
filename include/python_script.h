@@ -12,6 +12,7 @@
 
 #include <logger.h>
 #include <Python.h>
+#include <pyruntime.h>
 #include <rapidjson/document.h>
 
 class PythonScript {
@@ -24,13 +25,16 @@ class PythonScript {
 		void createJSON(PyObject *pValue, rapidjson::Value& node, rapidjson::Document::AllocatorType& alloc);
 		void freeMemObj(PyObject *obj1);
 		void freeMemAll(PyObject *obj1, char *str, PyObject *obj3);
+		void logError();
 
 		std::string		m_script;
 		bool			m_init;
 		Logger			*m_logger;
-		void			*m_libpythonHandle;
 		PyObject		*m_pFunc;
 		PyObject		*m_pModule;
+		PythonRuntime		*m_runtime;
+		bool			m_failedScript;
+		int			m_execCount;
 };
 
 #endif

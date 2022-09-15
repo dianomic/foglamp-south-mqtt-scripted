@@ -15,37 +15,25 @@
 using namespace std;
 using namespace rapidjson;
 
+void logError();
+
 /**
  * Constructor for the PythonScript class that is used to
  * convert the message payload
  *
  * @param name	The name of the south service
  */
-PythonScript::PythonScript(const string& name) : m_init(false), m_pFunc(NULL), m_libpythonHandle(NULL), m_pModule(NULL)
+PythonScript::PythonScript(const string& name) : m_init(false), m_pFunc(NULL), m_pModule(NULL)
 {
 	m_logger = Logger::getLogger();
+
+	// Set python program name
 	wchar_t *programName = Py_DecodeLocale(name.c_str(), NULL);
 	Py_SetProgramName(programName);
 	PyMem_RawFree(programName);
 
-	if (!Py_IsInitialized())
-	{
-#ifdef PLUGIN_PYTHON_SHARED_LIBRARY
-		string openLibrary = TO_STRING(PLUGIN_PYTHON_SHARED_LIBRARY);
-		if (!openLibrary.empty())
-		{
-			m_libpythonHandle = dlopen(openLibrary.c_str(),
-						  RTLD_LAZY | RTLD_LOCAL);
-			m_logger->info("Pre-loading of library '%s' "
-						  "is needed on this system",
-						  openLibrary.c_str());
-		}
-#endif
-		Py_Initialize();
-		//PyEval_InitThreads(); // Initialize and acquire the global interpreter lock (GIL)
-		PyThreadState* save = PyEval_SaveThread(); // release GIL
-		m_init = true;
-	}
+	// Inititialise embedded Python
+	m_runtime = PythonRuntime::getPythonRuntime();
 
 	PyGILState_STATE state = PyGILState_Ensure(); // acquire GIL
 
@@ -59,6 +47,8 @@ PythonScript::PythonScript(const string& name) : m_init(false), m_pFunc(NULL), m
 	// Remove temp object
 	Py_CLEAR(pPath);
 	PyGILState_Release(state);
+
+	m_init = true;
 }
 
 /**
@@ -66,24 +56,7 @@ PythonScript::PythonScript(const string& name) : m_init(false), m_pFunc(NULL), m
  */
 PythonScript::~PythonScript()
 {
-	if (m_init)
-	{
-		if (Py_IsInitialized())
-		{
-			PyGILState_STATE state = PyGILState_Ensure();
-			Py_CLEAR(m_pFunc);
-			Py_CLEAR(m_pModule);
-			Py_Finalize();
-
-			m_init = false;
-
-			if (m_libpythonHandle)
-			{
-				dlclose(m_libpythonHandle);
-			}
-
-		}
-	}
+	m_init = false;
 }
 
 /**
@@ -97,6 +70,9 @@ bool PythonScript::setScript(const string& name)
 {
 	m_logger->info("Script to execute is '%s'", name.c_str());
 
+	m_failedScript = false;
+	m_execCount = 0;
+
 	size_t start = name.find_last_of("/");
 	if (start != std::string::npos)
 	{
@@ -106,45 +82,77 @@ bool PythonScript::setScript(const string& name)
 	{
 		start = 0;
 	}
-	m_script = name.substr(start);
-	size_t end = m_script.rfind(".py");
-	if (end != std::string::npos)
-	{
-		m_script = m_script.substr(0, end);
-	}
 	PyGILState_STATE state = PyGILState_Ensure();
 
-	PyObject *pName = PyUnicode_FromString((char *)m_script.c_str());
-	if (m_pModule)
+	string scriptName = name.substr(start);
+	size_t end = scriptName.rfind(".py");
+	if (end != std::string::npos)
 	{
+		scriptName = scriptName.substr(0, end);
+	}
+
+	// Load or reload script into Python module object
+	if (m_script == scriptName && m_pModule)
+	{
+		m_logger->debug("Python reload module %s", m_script.c_str());
+
 		PyObject *new_module = PyImport_ReloadModule(m_pModule);
-		Py_CLEAR(m_pModule);
+		// The reload has failed but the previous module still
+		// exists so we must keep the old m_pModule value such
+		// that next time we do a reimport rather then a load module
+		if (!new_module)
+		{
+			logError();
+
+			PyGILState_Release(state);
+			m_failedScript = true;
+			return false;
+		}
+		if (m_pModule)
+		{
+			Py_CLEAR(m_pModule);
+			Py_CLEAR(m_pFunc);
+		}
 		m_pModule = new_module;
 	}
 	else
 	{
+		PyObject *pName = PyUnicode_FromString((char *)scriptName.c_str());
+		if (m_pModule)
+		{
+			Py_CLEAR(m_pModule);
+			Py_CLEAR(m_pFunc);
+		}
+		m_logger->debug("Python load module %s", scriptName.c_str());
+
 		m_pModule = PyImport_Import(pName);
+
+		Py_CLEAR(pName);
 	}
-	Py_CLEAR(pName);
+
 	if (!m_pModule)
 	{
-		m_logger->error("Failed to import script %s", m_script.c_str());
+		logError();
+
+		PyGILState_Release(state);
+		m_failedScript = true;
 		return false;
 	}
-	PyObject *pDict = PyModule_GetDict(m_pModule);
-	if (pDict)
+
+	// Set member variable
+	m_script = scriptName;
+
+	Py_CLEAR(m_pFunc);
+	m_pFunc = PyObject_GetAttrString(m_pModule, (char*)"convert");
+	if (!m_pFunc)
 	{
-		PyObject *new_func =  PyDict_GetItemString(pDict, (char*)"convert");
-		Py_CLEAR(m_pFunc);
-		m_pFunc = new_func;
-		Py_CLEAR(pDict);
+		m_logger->error("The supplied script does not define a function called 'convert'");
+		m_failedScript = true;
 	}
-	else
-	{
-		m_logger->error("Unable to extract dictionary from imported Python module");
-	}
+
 	PyGILState_Release(state);
-	return true;
+
+	return m_pFunc != NULL;;
 }
 
 /**
@@ -159,6 +167,17 @@ Document *PythonScript::execute(const string& message, const string& topic, stri
 {
 Document *doc = NULL;
 
+	if (m_failedScript)
+	{
+		m_execCount++;
+		if (m_execCount > 100)
+		{
+			m_logger->warn("The plugin is unable to process data without a valid 'convert' funtion in the script.");
+			m_execCount = 0;
+		}
+		return doc;
+	}
+
 	PyGILState_STATE state = PyGILState_Ensure();
 	if (m_pFunc)
 	{
@@ -172,61 +191,139 @@ Document *doc = NULL;
 			try {
 				pReturn = PyObject_CallFunction(m_pFunc, "ss", message.c_str(), topic.c_str());
 			} catch (exception& e) {
-				m_logger->error("Python script execution failed: %s", e.what());
+				m_logger->error("Execution of the convert Python function failed: %s", e.what());
 				return NULL;
 			}
 
 			if (!pReturn)
 			{
-				m_logger->error("Python convert function failed to return data");
+				logError();
+				return NULL;
+			}
+			else if (pReturn == Py_None)
+			{
+				doc = new Document();
+				auto& alloc = doc->GetAllocator();
+				doc->SetObject();
+				return doc;
+			}
+			else if (PyTuple_Check(pReturn))
+			{
+				if (PyArg_ParseTuple(pReturn, "O|O", &assetObject, &dict) == false)
+				{
+
+					m_logger->error("Return from Python convert function is of an incorrect type, it should be a Python DICT object or a string with the asset code and a DICT object with the reading data");
+					Py_CLEAR(pReturn);
+					m_failedScript = true;
+					m_execCount = 0;
+					return NULL;
+				}
+
+				if (assetObject == NULL)
+				{
+
+					m_logger->error("When the return from the Python convert function is a pair of values the first of these must be a string containing the asset code");
+					Py_CLEAR(pReturn);
+					m_failedScript = true;
+					m_execCount = 0;
+					return NULL;
+
+				}
+				else if (assetObject == Py_None)
+				{
+
+					m_logger->error("The returned asset name was None, either a valid string must be returned or the asset name may be omitted");
+					Py_CLEAR(pReturn);
+					m_failedScript = true;
+					m_execCount = 0;
+					return NULL;
+
+				}
+				else if (dict == NULL)
+				{
+
+					m_logger->error("Return from Python convert function is of an incorrect type, it should be a Python DICT object or a string with the asset code and a DICT object with the reading data");
+					Py_CLEAR(pReturn);
+					m_failedScript = true;
+					m_execCount = 0;
+					return NULL;
+
+				}
+				else if (dict == Py_None)
+				{
+					const char *name;
+					if (PyUnicode_Check(assetObject))
+					{
+						name = PyUnicode_AsUTF8(assetObject);
+					}
+					else if (PyBytes_Check(assetObject))
+					{
+						PyBytes_AsString(assetObject);
+					}
+					else
+					{
+						m_logger->error("When the return from the Python convert function is a pair of values the first of these must be a string contianing the asset name");
+						Py_CLEAR(pReturn);
+						m_failedScript = true;
+						m_execCount = 0;
+						return NULL;
+					}
+					asset = name;
+					doc = new Document();
+					auto& alloc = doc->GetAllocator();
+					doc->SetObject();
+					return doc;
+				}
+				else  if (! PyDict_Check(dict))
+				{
+
+					m_logger->error("When the return from the Python convert function is a pair of values the second of these must be a Python DICT");
+					Py_CLEAR(pReturn);
+					m_failedScript = true;
+					m_execCount = 0;
+					return NULL;
+				}
+
+				const char *name;
+			       	if (PyUnicode_Check(assetObject))
+				{
+					name = PyUnicode_AsUTF8(assetObject);
+				}
+				else if (PyBytes_Check(assetObject))
+				{
+					PyBytes_AsString(assetObject);
+				}
+				else
+				{
+					m_logger->error("When the return from the Python convert function is a pair of values the first of these must be a string containing the asset name");
+					Py_CLEAR(pReturn);
+					m_failedScript = true;
+					m_execCount = 0;
+					return NULL;
+				}
+				if (! *name)
+				{
+					m_logger->error("An empty asset name has been returned by the script. Asset names can not be empty");
+					Py_CLEAR(pReturn);
+					m_failedScript = true;
+					m_execCount = 0;
+					return NULL;
+				}
+				asset = name;
+				pValue = dict;
+
+			}
+			else if (!PyDict_Check(pReturn))
+			{
+				m_logger->error("Return from Python convert function is of an incorrect type, it should be a Python DICT object or a DICT object and a string");
+				Py_CLEAR(pReturn);
+				m_failedScript = true;
+				m_execCount = 0;
 				return NULL;
 			}
 			else
 			{
-				if (PyTuple_Check(pReturn)) {
-					if (PyArg_ParseTuple(pReturn, "O|O", &assetObject, &dict) == false) {
-
-						m_logger->error("a STRING and a DICT are expected as return values from the Python convert function");
-						Py_CLEAR(pReturn);
-						return NULL;
-					}
-
-					if (assetObject == NULL){
-
-						m_logger->error("a STRING is expected as the first value returned by the Python convert function");
-						Py_CLEAR(pReturn);
-						return NULL;
-
-					} else if (dict == NULL){
-
-						m_logger->error("a DICT is expected as the second value returned by the Python convert function");
-						Py_CLEAR(pReturn);
-						return NULL;
-
-					} else {
-						if (! PyDict_Check(dict)){
-
-							m_logger->error("a DICT is expected as the second value returned by the Python convert function");
-							Py_CLEAR(pReturn);
-							return NULL;
-						}
-					}
-
-					const char *name = PyUnicode_Check(assetObject) ?
-						PyUnicode_AsUTF8(assetObject) : PyBytes_AsString(assetObject);
-					asset = name;
-					pValue = dict;
-
-				} else {
-					if (!PyDict_Check(pReturn))
-					{
-						m_logger->error("Return from Python convert function is not a DICT object");
-						Py_CLEAR(pReturn);
-						return NULL;
-					}
-					pValue = pReturn;
-				}
-
+				pValue = pReturn;
 			}
 
 			doc = new Document();
@@ -277,11 +374,81 @@ Document *doc = NULL;
 	}
 	else
 	{
-		m_logger->fatal("Unable to create Python reference to function \"convert\"");
+		m_logger->fatal("The supplied Python script does not define a valid \"convert\" function");
 	}
 
 	PyGILState_Release(state);
 	return doc;
+}
+
+/**
+ * Log an error from the Python interpreter
+ */
+void PythonScript::logError()
+{
+PyObject *ptype, *pvalue, *ptraceback;
+
+	if (PyErr_Occurred())
+	{
+		PyErr_Fetch(&ptype, &pvalue, &ptraceback);
+		PyErr_NormalizeException(&ptype,&pvalue,&ptraceback);
+
+		char *msg, *file, *text;
+		int line, offset;
+
+		int res = PyArg_ParseTuple(pvalue,"s(siis)",&msg,&file,&line,&offset,&text);
+
+		PyObject *line_no = PyObject_GetAttrString(pvalue,"lineno");
+		PyObject *line_no_str = PyObject_Str(line_no);
+		PyObject *line_no_unicode = PyUnicode_AsEncodedString(line_no_str,"utf-8", "Error");
+		char *actual_line_no = PyBytes_AsString(line_no_unicode);  // Line number
+
+		PyObject *ptext = PyObject_GetAttrString(pvalue,"text");
+		PyObject *ptext_str = PyObject_Str(ptext);
+		PyObject *ptext_no_unicode = PyUnicode_AsEncodedString(ptext_str,"utf-8", "Error");
+		char *error_line = PyBytes_AsString(ptext_no_unicode);  // Line in error
+
+		// Remove the trailing newline from the string
+		char *newline = rindex(error_line,  '\n');
+		if (newline)
+		{
+			*newline = '\0';
+		}
+
+		// Not managed to find a way to get the actual error message from Python
+		// so use the string representation of the Error class and tidy it up, e.g.
+		// SyntaxError('invalid syntax', ('/tmp/scripts/test_addition_script_script.py', 9, 1, '}\n'))
+		PyObject *pstr = PyObject_Repr(pvalue);
+		PyObject *perr = PyUnicode_AsEncodedString(pstr, "utf-8", "Error");
+		char *err_msg = PyBytes_AsString(perr);
+		char *end = index(err_msg, ',');
+		if (end)
+		{
+			*end = '\0';
+		}
+		end = index(err_msg, '(');
+		if (end)
+		{
+			*end = ' ';
+		}
+
+		if (strncmp(err_msg, "TypeError \"convert()", strlen("TypeError \"convert()")) == 0)
+		{
+			// Special catch to give better error message
+			m_logger->error("The convert function defined in the Python script not have the correct number of arguments defined");
+		}
+		else if (error_line == NULL || actual_line_no == NULL || strcmp(error_line, "<NULL>") == 0
+			       	|| strcmp(actual_line_no, "<NULL>") == 0 || *error_line == 0)
+		{
+			m_logger->error("Python error: %s in supplied script", err_msg);
+		}
+		else
+		{
+			m_logger->error("Python error: %s in %s at line %s of supplied script", err_msg, error_line, actual_line_no);
+		}
+
+		PyErr_Clear();
+	}
 }
 
 void PythonScript::createJSON(PyObject *pValue, Value& node, Document::AllocatorType& alloc)
