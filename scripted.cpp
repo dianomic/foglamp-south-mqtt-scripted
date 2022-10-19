@@ -50,7 +50,7 @@ char *payloadptr;
 void connlost(void *context, char *cause)
 {
 	MQTTScripted *mqtt = (MQTTScripted *)context;
-	mqtt->reconnect();
+	mqtt->reconnection();
 }
 
 /**
@@ -64,11 +64,21 @@ int  sslErrorCallback(const char *str, size_t len, void *context)
 }
 
 /**
+ * Background thread used to triggered reconnection. This is the
+ * entry point that is called whern the thread is created, the actual
+ * work is done in the reconnectRetry method of the class.
+ */
+void reconnect_thread(MQTTScripted *mqtt)
+{
+	mqtt->reconnectRetry();
+}
+
+/**
  * Construct an MQTT Scripted south plugin
  *
  * @param config	The configuration category
  */
-MQTTScripted::MQTTScripted(ConfigCategory *config) : m_python(NULL), m_restart(false), m_state(mFailed)
+MQTTScripted::MQTTScripted(ConfigCategory *config) : m_python(NULL), m_restart(false), m_state(mFailed), m_reconnectThread(NULL), m_reap(false)
 {
 	m_name = config->getName();
 	m_logger = Logger::getLogger();
@@ -155,14 +165,19 @@ void MQTTScripted::processPolicy(const string& policy)
 	}
 	else
 	{
-		Logger::getLogger()->error("Unsupported value for policy configuration '%s'", policy.c_str());
+		m_logger->error("Unsupported value for policy configuration '%s'", policy.c_str());
 	}
 }
 
+/**
+ * Wrapper that is used to collect trace messages from the MQTT Client library and
+ * add them to the logging system of FogLAMP.
+ */
 void traceCallback(enum MQTTCLIENT_TRACE_LEVELS level, char* message)
 {
 	Logger::getLogger()->debug("Trace: %s", message);
 }
+
 /**
  * Called when the plugin is started
  * 
@@ -172,20 +187,16 @@ void traceCallback(enum MQTTCLIENT_TRACE_LEVELS level, char* message)
 bool MQTTScripted::start()
 {
 	lock_guard<mutex> guard(m_mutex);
-
-
-	// Connect to the MQTT broker
-	MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
-	MQTTClient_deliveryToken token;
 	int rc;
 
 	if ((rc = MQTTClient_create(&m_client, m_broker.c_str(), m_clientID.c_str(),
 		MQTTCLIENT_PERSISTENCE_NONE, NULL)) != MQTTCLIENT_SUCCESS)
 	{
-		Logger::getLogger()->error("Failed to create client, return code %d\n", rc);
+		m_logger->fatal("Failed to create MQTT client, return code %d\n", rc);
 		m_state = mFailed;
 		return false;
 	}
+
 	m_state = mCreated;
 
 	MQTTClient_setTraceCallback(traceCallback);
@@ -193,65 +204,11 @@ bool MQTTScripted::start()
 
 	MQTTClient_setCallbacks(m_client, this, connlost, msgarrvd, NULL);
 
-	conn_opts.keepAliveInterval = 20;
-	conn_opts.cleansession = 1;
 
-	if (m_username.length())
-	{
-		conn_opts.username = m_username.c_str();
-		conn_opts.password = m_password.c_str();
-	}
+	// Do the actual connection in the background to prevent the
+	// service becoming unresponsive if the broker is not reachable
+	backgroundReconnect();
 
-	// Do we need MQTTS support
-	MQTTClient_SSLOptions sslopts = MQTTClient_SSLOptions_initializer;
-	if (m_serverCert.length())
-	{
-		string serverCert = serverCertPath();
-		sslopts.trustStore = strdup(serverCert.c_str());
-		string clientCert = clientCertPath();
-		sslopts.keyStore = strdup(clientCert.c_str());
-		if (m_key.length())
-		{
-			string privateKey = privateKeyPath();
-			sslopts.privateKey = strdup(privateKey.c_str());
-		}
-		if (m_keyPass.length())
-		{
-			sslopts.privateKeyPassword = m_keyPass.c_str();
-		}
-
-		sslopts.ssl_error_cb = sslErrorCallback;
-		sslopts.ssl_error_context = this;
-
-		sslopts.enableServerCertAuth = false;
-		sslopts.verify = false;
-
-		conn_opts.ssl = &sslopts;
-		m_logger->info("Trust store: %s", sslopts.trustStore);
-		m_logger->info("Key store: %s", sslopts.keyStore);
-		m_logger->info("Private key: %s", sslopts.privateKey);
-	}
-	rc = MQTTClient_connect(m_client, &conn_opts);
-	if (sslopts.trustStore)
-		free((void *)sslopts.trustStore);
-	if (sslopts.keyStore)
-		free((void *)sslopts.keyStore);
-	if (sslopts.privateKey)
-		free((void *)sslopts.privateKey);
-	if (rc != MQTTCLIENT_SUCCESS)
-	{
-		Logger::getLogger()->error("Failed to connect, return code %d\n", rc);
-		return false;
-	}
-	m_state = mConnected;
-
-	// Subscribe to the topic
-	if ((rc = MQTTClient_subscribe(m_client, m_topic.c_str(), m_qos)) != MQTTCLIENT_SUCCESS)
-	{
-		Logger::getLogger()->error("Failed to subscribe to topic, return code %d\n", rc);
-		return false;
-	}
-	Logger::getLogger()->info("Subscribed to topic '%s'", m_topic.c_str());
 	return true;
 }
 
@@ -267,7 +224,7 @@ int rc;
 	if (m_state == mConnected)
 	{
 		if ((rc = MQTTClient_disconnect(m_client, 10000)) != MQTTCLIENT_SUCCESS)
-			Logger::getLogger()->error("Failed to disconnect, return code %d\n", rc);
+			m_logger->error("Failed to disconnect, return code %d\n", rc);
 	}
 	if (m_state == mConnected || m_state == mCreated)
 	{
@@ -279,10 +236,14 @@ int rc;
 
 /**
  * Reconnect to the MQTT broker on connection failure
+ *
+ * @return true if the reconnection succeeded
  */
-void MQTTScripted::reconnect()
+bool MQTTScripted::reconnect()
 {
 int rc;
+
+	lock_guard<mutex> guard(m_mutex);
 
 	MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
 	conn_opts.keepAliveInterval = 20;
@@ -331,16 +292,18 @@ int rc;
 		free((void *)sslopts.privateKey);
 	if (rc != MQTTCLIENT_SUCCESS)
 	{
-		Logger::getLogger()->error("Failed to connect, return code %d\n", rc);
-		return;
+		m_logger->error("Failed to connect to MQTT broker %s, return code %d\n", m_broker.c_str(), rc);
+		return false;
 	}
 
+	m_state = mConnected;
 	// Subscribe to the topic
 	if ((rc = MQTTClient_subscribe(m_client, m_topic.c_str(), m_qos)) != MQTTCLIENT_SUCCESS)
 	{
-		Logger::getLogger()->error("Failed to subscribe to topic, return code %d\n", rc);
-		return;
+		m_logger->error("Failed to subscribe to topic ''%s', return code %d\n", m_topic.c_str(), rc);
+		return false;
 	}
+	return true;
 }
 
 /**
@@ -430,7 +393,7 @@ void MQTTScripted::reconfigure(const ConfigCategory& category)
 
 	if (resubscribe)
 	{
-		Logger::getLogger()->info("Resubscribing to MQTT broker following reconfiguration");
+		m_logger->info("Resubscribing to MQTT broker %s following reconfiguration", m_broker.c_str());
 		// The MQTT broker has changed
 		(void)MQTTClient_disconnect(m_client, 10000);
 		MQTTClient_destroy(&m_client);
@@ -441,16 +404,17 @@ void MQTTScripted::reconfigure(const ConfigCategory& category)
 		MQTTClient_deliveryToken token;
 		int rc;
 
-		Logger::getLogger()->debug("Create MQTT Client '%s' with clientID '%s'", m_broker.c_str(), m_clientID.c_str());
+		m_logger->debug("Create MQTT Client '%s' with clientID '%s'", m_broker.c_str(), m_clientID.c_str());
 		if ((rc = MQTTClient_create(&m_client, m_broker.c_str(), m_clientID.c_str(),
 			MQTTCLIENT_PERSISTENCE_NONE, NULL)) != MQTTCLIENT_SUCCESS)
 		{
-			Logger::getLogger()->error("Failed to create client, return code %d\n", rc);
+			m_logger->error("Failed to create client, return code %d\n", rc);
 		}
 		else
 		{
 			MQTTClient_setCallbacks(m_client, this, connlost, msgarrvd, NULL);
-			reconnect();
+			// Start a background thread to attempt the reconnection
+			backgroundReconnect();
 		}
 	}
 
@@ -458,7 +422,7 @@ void MQTTScripted::reconfigure(const ConfigCategory& category)
 	string content = category.getValue("script");
 	if (m_content.compare(content))	// Script content has changed
 	{
-		Logger::getLogger()->info("Reconfiguration has changed the Python script");
+		m_logger->info("Reconfiguration has changed the Python script");
 		m_restart = true;
 		m_content = content;
 	}
@@ -476,19 +440,26 @@ Document doc;
 
 	lock_guard<mutex> guard(m_mutex);
 
-	Logger::getLogger()->debug("Processing MQTT message: %s with script %s", message.c_str(), m_script.c_str());
+	if (m_reap)	// Reap the reconnection thread if required
+	{
+		m_reconnectThread->join();
+		m_reconnectThread = NULL;
+		m_reap = false;
+	}
+
+	m_logger->debug("Processing MQTT message: %s with script %s", message.c_str(), m_script.c_str());
 	if (m_script.empty() || m_script.compare("\"\"") == 0)
 	{
 		// Message should be JSON
 		doc.Parse(message.c_str());
 		if (doc.HasParseError() == false && doc.IsObject())
 		{
-			Logger::getLogger()->debug("Message is JSON");
+			m_logger->debug("Message is JSON");
 			processDocument(doc, m_asset);
 		}
 		else
 		{
-			Logger::getLogger()->debug("Message is assumed to be simple value");
+			m_logger->debug("Message is assumed to be simple value");
 			// Maybe it is a simple value
 			int i;
 			bool nonNumeric = false;
@@ -504,7 +475,7 @@ Document doc;
 			}
 			else
 			{
-				Logger::getLogger()->warn("Unable to process message '%s' expecting a simple value",
+				m_logger->warn("Unable to process message '%s' expecting a simple value",
 						message.c_str());
 			}
 		}
@@ -515,7 +486,7 @@ Document doc;
 
 		if (m_restart)
 		{
-			Logger::getLogger()->info("Script content has changed, reloading");
+			m_logger->info("Script content has changed, reloading");
 			if (m_python && m_script.empty() == false)
 			{
 				m_python->setScript(m_script);
@@ -533,7 +504,7 @@ Document doc;
 			}
 			processDocument(*d, asset);
 
-			Logger::getLogger()->debug("%s - message :%s: topic :%s: asset :%s: ", __FUNCTION__ , message.c_str(), topic.c_str(), asset.c_str() );
+			m_logger->debug("%s - message :%s: topic :%s: asset :%s: ", __FUNCTION__ , message.c_str(), topic.c_str(), asset.c_str() );
 
 			delete d;
 		}
@@ -629,7 +600,7 @@ void MQTTScripted::processDocument(Document& doc, const string& asset)
 {
 	if (m_policy == mPolicyFirstLevel)
 	{
-		Logger::getLogger()->debug("Policy is to take data from the first level only");
+		m_logger->debug("Policy is to take data from the first level only");
 		vector<Datapoint *> points;
 		string ts;
 		getValues(doc.GetObject(), points, false, ts);
@@ -643,7 +614,7 @@ void MQTTScripted::processDocument(Document& doc, const string& asset)
 	}
 	else if (m_policy == mPolicyCollapse)
 	{
-		Logger::getLogger()->debug("Policy is to collapse data into a single reading");
+		m_logger->debug("Policy is to collapse data into a single reading");
 		vector<Datapoint *> points;
 		string ts;
 		getValues(doc.GetObject(), points, true, ts);
@@ -657,7 +628,7 @@ void MQTTScripted::processDocument(Document& doc, const string& asset)
 	}
 	else if (m_policy == mPolicyMultiple)
 	{
-		Logger::getLogger()->debug("Policy is to create multiple readings");
+		m_logger->debug("Policy is to create multiple readings");
 		string user_ts;
 		vector<Datapoint *> points;
 		for (auto& m : doc.GetObject())
@@ -798,4 +769,54 @@ double  fraction = 0;
 	ts = buf;
 	snprintf(buf, sizeof(buf), "%1.6f", fraction);
 	ts += &buf[1];
+}
+
+/**
+ * Start a background thread to perform reconnection to the MQTT broker, must be called
+ * holding the mutex, must be called
+ * holding the mutex
+ */
+void MQTTScripted::backgroundReconnect()
+{
+	if (m_reap)
+	{
+		m_reconnectThread->join();
+		m_reconnectThread = NULL;
+		m_reap = false;
+	}
+
+	if (!m_reconnectThread)
+	{
+		m_reconnectThread = new thread(&reconnect_thread, this);
+	}
+}
+
+/**
+ * Background thread used to reconnect to the MQTT broker. The thread will terminate once
+ * the connection is established.
+ */
+void MQTTScripted::reconnectRetry()
+{
+	int waitfor = INITIAL_RECONNECT_WAIT;
+	bool logConnection = false;
+	
+	if (m_state == mConnected)	// Only log if we were previously connected
+	{
+		m_logger->getLogger()->warn("Attempting to reconnect to the MQTT Broker");
+		logConnection = true;
+	}
+	bool connected = false;
+	do {
+		this_thread::sleep_for(std::chrono::milliseconds(waitfor));
+		connected = reconnect();
+		if (waitfor < MAX_RECONNECT_WAIT)
+		{
+			waitfor *= 10;
+		}
+	} while (!connected);
+	if (logConnection)
+	{
+		m_logger->getLogger()->warn("Connected to the MQTT Broker %s", m_broker.c_str());
+	}
+	m_reap = true;
 }
