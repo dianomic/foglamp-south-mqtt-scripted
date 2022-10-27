@@ -18,9 +18,12 @@
 #include <string>
 #include <vector>
 #include <mutex>
+#include <thread>
 
 typedef void (*INGEST_CB)(void *, Reading);
 
+#define	INITIAL_RECONNECT_WAIT	100	// Number of milliseconds before next attempt to reconnect
+#define MAX_RECONNECT_WAIT	(10 * INITIAL_RECONNECT_WAIT)
 
 /**
  * A scripted MQTT client plugin.
@@ -46,11 +49,16 @@ class MQTTScripted {
 					m_data = data;
 				}
 		void		processMessage(const std::string& topic, const std::string& payload);
-		void		reconnect();
+		bool		reconnect();
 		std::string	getName() { return m_name; };
 		void		sslError(const char *str, int len) {
 					m_logger->error("SSL Error: %s", str);
 				};
+		void		reconnection() {
+					std::lock_guard<std::mutex> guard(m_mutex);
+					backgroundReconnect();
+				}
+		void		reconnectRetry();
 	private:
 		void			(*m_ingest)(void *, Reading);
 		std::string		privateKeyPath();
@@ -61,6 +69,7 @@ class MQTTScripted {
 		void			getValues(const rapidjson::Value& object, std::vector<Datapoint *>& points, bool recurse, std::string& user_ts);
 		void			processPolicy(const std::string& policy);
 		void			convertTimestamp(std::string& ts);
+		void			backgroundReconnect();
 
 	private:
 		std::string		m_asset;
@@ -95,5 +104,7 @@ class MQTTScripted {
 		std::string		m_timestamp;
 		std::string		m_timeFormat;
 		long			m_offset;
+		std::thread		*m_reconnectThread;
+		bool			m_reap;
 };
 #endif
