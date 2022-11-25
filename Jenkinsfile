@@ -32,7 +32,7 @@ timestamps {
                 stage("Run Tests") {
                     echo "Executing tests..."
                     sh '''
-                        export FOGLAMP_ROOT=${WORKSPACE}/FogLAMP
+                        export FOGLAMP_ROOT=${WORKSPACE}/FogLAMP && export PYTHONPATH=${FOGLAMP_ROOT}/python
                         cd tests && cmake . && make && ./RunTests --gtest_output=xml:test_output.xml
                     '''
                     echo "Done."
