@@ -1,4 +1,6 @@
-# foglamp-south-mqtt-scripted
+south-mqtt-scripted
+===================
+
 A south plugin that uses MQTT to receive messages via an MQTT broker from sensor. An optional script may be given, written is Python, that converts the message into a JSON document.
 
 If the payload of the MQTT is a JSON document with simple key/value pairs, e.g.
