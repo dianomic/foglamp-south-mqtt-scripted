@@ -10,7 +10,6 @@ using namespace std;
 int main(int argc, char **argv) {
     testing::InitGoogleTest(&argc, argv);
 
-    setenv("PYTHONPATH", ".", 1);
     wchar_t *programName = Py_DecodeLocale("unitTest", NULL);
     Py_SetProgramName(programName);
     PyMem_RawFree(programName);
