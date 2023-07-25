@@ -2,6 +2,8 @@
 #include <resultset.h>
 #include <string.h>
 #include <string>
+#include <pyruntime.h>
+#include <Python.h>
 
 using namespace std;
 
@@ -9,10 +11,9 @@ int main(int argc, char **argv) {
     testing::InitGoogleTest(&argc, argv);
 
     setenv("PYTHONPATH", ".", 1);
-
-    testing::GTEST_FLAG(repeat) = 200;
-    testing::GTEST_FLAG(shuffle) = true;
-    testing::GTEST_FLAG(death_test_style) = "threadsafe";
+    wchar_t *programName = Py_DecodeLocale("unitTest", NULL);
+    Py_SetProgramName(programName);
+    PyMem_RawFree(programName);
 
     return RUN_ALL_TESTS();
 }
