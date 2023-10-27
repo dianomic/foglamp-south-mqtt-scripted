@@ -15,11 +15,11 @@
 
 .. |rename| raw:: html
 
-   <a href="../foglamp-filter-asset/rename.html">foglamp-filter-rename</a>
+   <a href="../foglamp-filter-rename/index.html">foglamp-filter-rename</a>
 
 .. |replace| raw:: html
 
-   <a href="../foglamp-filter-asset/replace.html">foglamp-filter-replace</a>
+   <a href="../foglamp-filter-replace/index.html">foglamp-filter-replace</a>
 
 MQTT South with Payload Scripting
 =================================
