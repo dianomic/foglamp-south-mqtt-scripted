@@ -5,14 +5,6 @@
 .. |logview_2| image:: images/logview_2.png
 
 .. Links
-.. |assetsplit| raw:: html
-
-   <a href="../foglamp-filter-asset-split/index.html">foglamp-filter-asset-split</a>
-   
-.. |asset| raw:: html
-
-   <a href="../foglamp-filter-asset/index.html">foglamp-filter-asset</a>
-
 .. |rename| raw:: html
 
    <a href="../foglamp-filter-rename/index.html">foglamp-filter-rename</a>
