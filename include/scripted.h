@@ -24,6 +24,7 @@ typedef void (*INGEST_CB)(void *, Reading);
 
 #define	INITIAL_RECONNECT_WAIT	100	// Number of milliseconds before next attempt to reconnect
 #define MAX_RECONNECT_WAIT	(10 * INITIAL_RECONNECT_WAIT)
+#define CONNECT_ERROR_INTERVAL  60      // Interval between connection errors in seconds
 
 /**
  * A scripted MQTT client plugin.
@@ -106,5 +107,6 @@ class MQTTScripted {
 		long			m_offset;
 		std::thread		*m_reconnectThread;
 		bool			m_reap;
+		time_t			m_connectFailTime;
 };
 #endif
