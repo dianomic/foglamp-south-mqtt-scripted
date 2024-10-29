@@ -78,7 +78,7 @@ void reconnect_thread(MQTTScripted *mqtt)
  *
  * @param config	The configuration category
  */
-MQTTScripted::MQTTScripted(ConfigCategory *config) : m_python(NULL), m_restart(false), m_state(mFailed), m_reconnectThread(NULL), m_reap(false)
+MQTTScripted::MQTTScripted(ConfigCategory *config) : m_python(NULL), m_restart(false), m_state(mFailed), m_reconnectThread(NULL), m_reap(false), m_connectFailTime(0)
 {
 	m_name = config->getName();
 	m_logger = Logger::getLogger();
@@ -192,7 +192,7 @@ bool MQTTScripted::start()
 	if ((rc = MQTTClient_create(&m_client, m_broker.c_str(), m_clientID.c_str(),
 		MQTTCLIENT_PERSISTENCE_NONE, NULL)) != MQTTCLIENT_SUCCESS)
 	{
-		m_logger->fatal("Failed to create MQTT client, return code %d\n", rc);
+		m_logger->fatal("Failed to create MQTT client, MQTT reports %s\n", MQTTClient_strerror(rc));
 		m_state = mFailed;
 		return false;
 	}
@@ -224,7 +224,7 @@ int rc;
 	if (m_state == mConnected)
 	{
 		if ((rc = MQTTClient_disconnect(m_client, 10000)) != MQTTCLIENT_SUCCESS)
-			m_logger->error("Failed to disconnect, return code %d\n", rc);
+			m_logger->error("Failed to disconnect, MQTT reports %s", MQTTClient_strerror(rc));
 	}
 	if (m_state == mConnected || m_state == mCreated)
 	{
@@ -292,15 +292,31 @@ int rc;
 		free((void *)sslopts.privateKey);
 	if (rc != MQTTCLIENT_SUCCESS)
 	{
-		m_logger->error("Failed to connect to MQTT broker %s, return code %d\n", m_broker.c_str(), rc);
+		// We report the error the first time it occurs and then every
+		// CONNECT_ERROR_INTERVAL seconds until it clears. Once cleared
+		// we will report it immediately it re-occurs
+		if (m_connectFailTime == 0)
+		{
+			m_logger->error("Failed to connect to MQTT broker %s, MQTT reports %s. Check your configuration, the MQTT broker is running and contactable", m_broker.c_str(), MQTTClient_strerror(rc));
+			m_connectFailTime = time(0) + CONNECT_ERROR_INTERVAL;
+		}
+		else if (m_connectFailTime < time(0))
+		{
+			m_logger->error("Still unable to connect to MQTT broker %s, MQTT reports %s", m_broker.c_str(), MQTTClient_strerror(rc));
+			m_connectFailTime = time(0) + CONNECT_ERROR_INTERVAL;
+		}
 		return false;
+	}
+	else if (m_connectFailTime)
+	{
+		m_logger->warn("Reconnected to the MQTT broker %s, after a period of failed connection", m_broker.c_str());
 	}
 
 	m_state = mConnected;
 	// Subscribe to the topic
 	if ((rc = MQTTClient_subscribe(m_client, m_topic.c_str(), m_qos)) != MQTTCLIENT_SUCCESS)
 	{
-		m_logger->error("Failed to subscribe to topic ''%s', return code %d\n", m_topic.c_str(), rc);
+		m_logger->error("Failed to subscribe to topic ''%s', MQTT reports %s\n", m_topic.c_str(), MQTTClient_strerror(rc));
 		return false;
 	}
 	return true;
@@ -408,7 +424,7 @@ void MQTTScripted::reconfigure(const ConfigCategory& category)
 		if ((rc = MQTTClient_create(&m_client, m_broker.c_str(), m_clientID.c_str(),
 			MQTTCLIENT_PERSISTENCE_NONE, NULL)) != MQTTCLIENT_SUCCESS)
 		{
-			m_logger->error("Failed to create client, return code %d\n", rc);
+			m_logger->error("Failed to create client, MQTT reports %s", MQTTClient_strerror(rc));
 		}
 		else
 		{
