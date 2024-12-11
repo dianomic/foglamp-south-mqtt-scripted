@@ -175,7 +175,34 @@ void MQTTScripted::processPolicy(const string& policy)
  */
 void traceCallback(enum MQTTCLIENT_TRACE_LEVELS level, char* message)
 {
-	Logger::getLogger()->debug("Trace: %s", message);
+    switch (level) 
+	{
+        case MQTTCLIENT_TRACE_MAXIMUM:
+        case MQTTCLIENT_TRACE_MEDIUM:
+        case MQTTCLIENT_TRACE_MINIMUM:
+            // Ignored: These log levels are not useful for plugin purposes
+            break;
+
+        case MQTTCLIENT_TRACE_PROTOCOL:
+            Logger::getLogger()->debug("Protocol Trace: %s", message);
+            break;
+
+        case MQTTCLIENT_TRACE_ERROR:
+            Logger::getLogger()->error("Error Trace: %s", message);
+            break;
+
+        case MQTTCLIENT_TRACE_SEVERE:
+            Logger::getLogger()->fatal("Severe Trace: %s", message);
+            break;
+
+        case MQTTCLIENT_TRACE_FATAL:
+            Logger::getLogger()->fatal("Fatal Trace: %s", message);
+            break;
+
+        default:
+            Logger::getLogger()->warn("Unknown Trace Level [%d]: %s", level, message);
+            break;
+    }
 }
 
 /**
@@ -200,7 +227,7 @@ bool MQTTScripted::start()
 	m_state = mCreated;
 
 	MQTTClient_setTraceCallback(traceCallback);
-	MQTTClient_setTraceLevel(MQTTCLIENT_TRACE_MAXIMUM);
+	MQTTClient_setTraceLevel(MQTTCLIENT_TRACE_PROTOCOL);
 
 	MQTTClient_setCallbacks(m_client, this, connlost, msgarrvd, NULL);
 
