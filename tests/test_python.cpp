@@ -103,10 +103,10 @@ TEST(MQTTScripted, NoFunc)
 TEST(MQTTScripted, RuntimError)
 {
 	PythonScript python("Test1");
-	const char *fname = "syntax.py";
+	const char *fname = "div0.py";
 	FILE *fp = fopen(fname, "w");
 	fprintf(fp, "def convert(message, topic):\n");
-	fprintf(fp, "    nonsense");
+	fprintf(fp, "    a = 10 / 0");
 	fclose(fp);
 	ASSERT_EQ(python.setScript(fname), true);
 	string message = "{ \"a\" : \"b\" }";
